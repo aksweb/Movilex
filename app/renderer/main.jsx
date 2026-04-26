@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import PreviewPane from './components/PreviewPane';
+import FileTable from './components/FileTable';
 
 function App() {
   const [tree, setTree] = useState({});
@@ -10,10 +11,8 @@ function App() {
   const [expanded, setExpanded] = useState(new Set());
   const [selectedFile, setSelectedFile] = useState(null);
 
-  // ---------- LOADING WRAPPER ----------
   const withLoading = async (fn) => {
     if (loading) return;
-
     setLoading(true);
     try {
       return await fn();
@@ -22,7 +21,6 @@ function App() {
     }
   };
 
-  // ---------- SELECT SOURCE ----------
   const selectSource = async () => {
     const dir = await window.api.selectFolder();
     if (!dir) return;
@@ -31,118 +29,51 @@ function App() {
 
     await withLoading(async () => {
       const children = await window.api.listDirectory(dir);
-
-      setTree({
-        [dir]: children
-      });
-
+      setTree({ [dir]: children });
       setExpanded(new Set([dir]));
     });
   };
 
-  // ---------- SELECT DEST ----------
   const selectDest = async () => {
     const dir = await window.api.selectDestinationFolder();
     if (!dir) return;
-
     setDestRoot(dir);
   };
 
-  // ---------- TOGGLE FOLDER ----------
-  const toggleFolder = async (folderPath) => {
-    const isExpanded = expanded.has(folderPath);
+  const flattenTree = (root) => {
+    const result = [];
 
-    if (isExpanded) {
-      setExpanded(prev => {
-        const next = new Set(prev);
-        next.delete(folderPath);
-        return next;
-      });
-      return;
-    }
+    const dfs = (path) => {
+      const items = tree[path] || [];
 
-    if (!tree[folderPath]) {
-      await withLoading(async () => {
-        const children = await window.api.listDirectory(folderPath);
+      for (const item of items) {
+        if (item.type === 'file') {
+          result.push(item);
+        } else if (item.type === 'folder') {
+          dfs(item.path);
+        }
+      }
+    };
 
-        setTree(prev => ({
-          ...prev,
-          [folderPath]: children
-        }));
-      });
-    }
-
-    setExpanded(prev => new Set(prev).add(folderPath));
+    if (root) dfs(root);
+    return result;
   };
 
-  // ---------- MOVE FILE ----------
-  const move = async (file, category) => {
-    if (!destRoot) {
-      alert("Select destination folder first");
-      return;
-    }
-
-    await withLoading(async () => {
-      await window.api.moveFile({
-        id: file.id || 0,
-        path: file.path || file.original_path,
-        category,
-        destRoot
-      });
-    });
-  };
-
-  // ---------- OPEN FILE ----------
   const openFile = async (file) => {
     await window.api.openFile(file.path || file.original_path);
   };
 
-  // ---------- TREE RENDER ----------
-  const renderTree = (path, level = 0) => {
-    const items = tree[path] || [];
-
-    return items.map(item => (
-      <div key={item.path} style={{ paddingLeft: level * 14 }}>
-
-        {item.type === 'folder' ? (
-          <div
-            onClick={() => toggleFolder(item.path)}
-            style={{ cursor: 'pointer', fontWeight: 'bold' }}
-          >
-            {expanded.has(item.path) ? '▼' : '▶'} {item.name}
-          </div>
-        ) : (
-          <div
-            onClick={() => setSelectedFile(item)}   // ✅ IMPORTANT
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-              openFile(item);
-            }}
-            style={{
-              userSelect: 'none',
-              background: selectedFile?.path === item.path ? '#ddd' : 'transparent',
-              padding: '2px'
-            }}
-          >
-            {item.name}
-
-            <button onClick={() => move(item, 'project_1')}>P1</button>
-            <button onClick={() => move(item, 'project_2')}>P2</button>
-            <button onClick={() => move(item, 'rejected')}>Reject</button>
-            <button onClick={() => move(item, 'halt')}>Halt</button>
-          </div>
-        )}
-
-        {expanded.has(item.path) && tree[item.path] &&
-          renderTree(item.path, level + 1)}
-      </div>
-    ));
-  };
-
   return (
-    <div style={{ display: 'flex', height: '100vh' }}>
+    <div
+      style={{
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden' // 🔥 CRITICAL: disables page scroll
+      }}
+    >
 
-      {/* -------- LOADER -------- */}
+      {/* LOADER */}
       {loading && (
         <div style={{
           position: 'fixed',
@@ -162,38 +93,112 @@ function App() {
         </div>
       )}
 
-      {/* -------- LEFT: TREE -------- */}
-      <div style={{ width: '40%', overflow: 'auto', padding: 10 }}>
-        <button onClick={selectSource}>Select Source</button>
-        <div>{sourceRoot || "No source selected"}</div>
+      {/* TOP BAR */}
+      <div style={{
+        height: '15vh',
+        display: 'flex',
+        borderBottom: '1px solid #ccc',
+        flexShrink: 0
+      }}>
 
-        <button onClick={selectDest}>Select Destination</button>
-        <div>{destRoot || "No destination selected"}</div>
+        {/* LEFT */}
+        <div style={{
+          width: '20vw',
+          padding: 10,
+          borderRight: '1px solid #ccc'
+        }}>
+          <button onClick={selectSource}>Select Source</button>
+          <br />
+          <button onClick={selectDest}>Create Destination</button>
 
-        <div style={{ marginTop: 20 }}>
-          {sourceRoot && renderTree(sourceRoot)}
+          <div style={{ marginTop: 10 }}>
+            <div>Source: {sourceRoot || "-"}</div>
+            <div>Dest: {destRoot || "-"}</div>
+          </div>
+        </div>
+
+        {/* RIGHT */}
+        <div style={{ flex: 1, padding: 10 }}>
+          <button>Show Source Files</button>
+          <button style={{ marginLeft: 10 }}>Show Destination Files</button>
         </div>
       </div>
 
-      {/* -------- RIGHT: PREVIEW -------- */}
+      {/* MAIN AREA */}
       <div style={{
-        width: '40%',
-        borderLeft: '2px solid #ccc',
-        overflow: 'auto'
+        flex: 1,
+        display: 'flex',
+        minHeight: 0 // 🔥 FIX flex overflow
       }}>
-        <PreviewPane file={selectedFile} />
-      </div>
-      {/* <div
-      style={{
-        width: '40%',
-        height: '50vh',        // 🔥 key change
-        borderLeft: '1px solid #ccc',
-        overflow: 'hidden'     // 🔥 no overflow
-      }}
->
-  <PreviewPane file={selectedFile} />
-</div> */}
 
+        {/* LEFT PANEL */}
+        <div style={{
+          width: '20vw',
+          borderRight: '1px solid #ccc',
+          padding: 10,
+          overflow: 'auto',
+          minHeight: 0
+        }}>
+          <h4>Destinations</h4>
+          <div>Coming soon...</div>
+        </div>
+
+        {/* RIGHT PANEL */}
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          minHeight: 0 // 🔥 IMPORTANT
+        }}>
+
+          {/* FILE PANEL */}
+          <div style={{
+            width: '40vw',
+            borderRight: '1px solid #ccc',
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+            overflow: 'hidden',
+            minHeight: 0
+          }}>
+
+            {/* HEADER */}
+            <div style={{
+              padding: 10,
+              borderBottom: '1px solid #ccc',
+              flexShrink: 0
+            }}>
+              <h4>Files</h4>
+            </div>
+
+            {/* SCROLL AREA */}
+            <div style={{
+              flex: 1,
+              overflow: 'auto', // 🔥 ONLY SCROLL HERE
+              padding: 10,
+              minHeight: 0
+            }}>
+              <FileTable
+                files={flattenTree(sourceRoot)}
+                setSelectedFile={setSelectedFile}
+                openFile={openFile}
+                selectedFile={selectedFile}
+              />
+            </div>
+
+          </div>
+
+          {/* PREVIEW PANEL */}
+          <div style={{
+            width: '40vw',
+            overflow: 'hidden',
+            height: '100%',
+            minHeight: 0
+          }}>
+            <PreviewPane file={selectedFile} />
+          </div>
+
+        </div>
+      </div>
     </div>
   );
 }
