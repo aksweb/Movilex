@@ -11,9 +11,13 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [expandedSource, setExpandedSource] = useState(new Set());
   const [expandedDest, setExpandedDest] = useState(new Set());
-  const [destinations, setDestinations] = useState([]);
   const [newDestName, setNewDestName] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
+  const [previewSourceFile, setPreviewSourceFile] = useState(null);
+const [previewDestFile, setPreviewDestFile] = useState(null);
+
+const [destinations, setDestinations] = useState([]);
+// [{ name, path, checked }]
 
 
   const withLoading = async (fn) => {
@@ -43,14 +47,18 @@ function App() {
     const dir = await window.api.selectDestinationFolder();
     if (!dir) return;
   
-    const name = newDestName || dir.split('/').pop();
+    const name = dir.split('/').pop();
   
-    const dest = { name, path: dir };
+    const newDest = {
+      name,
+      path: dir,
+      checked: true
+    };
   
-    setDestinations(prev => [...prev, dest]);
-    setDestRoot(dir);
+    // prevent duplicates
+    if (destinations.some(d => d.path === dir)) return;
   
-    setNewDestName(""); // reset input
+    setDestinations(prev => [...prev, newDest]);
   
     await withLoading(async () => {
       const children = await window.api.listDirectory(dir);
@@ -63,6 +71,16 @@ function App() {
       setExpandedDest(prev => new Set(prev).add(dir));
     });
   };
+
+  //  toggleDestination visibility
+  const toggleDestination = (path) => {
+    setDestinations(prev =>
+      prev.map(d =>
+        d.path === path ? { ...d, checked: !d.checked } : d
+      )
+    );
+  };
+
 
   //Expanding files and folders
     const flattenTree = (root) => {
@@ -259,6 +277,7 @@ function App() {
           <button>Show Source Files</button>
           <button style={{ marginLeft: 10 }}>Show Destination Files</button>
         </div>
+
       </div>
 
       {/* MAIN AREA */}
@@ -268,84 +287,141 @@ function App() {
         minHeight: 0 // 🔥 FIX flex overflow
       }}>
 
+       
+
         {/* LEFT PANEL */}
-        <div style={{
-          width: '20vw',
-          borderRight: '1px solid #ccc',
-          padding: 10,
-          overflow: 'auto',
-          minHeight: 0
-        }}>
+        {/* MAIN CONTENT (2 PANES ONLY) */}
+<div style={{
+  flex: 1,
+  display: 'flex',
+  minHeight: 0
+}}>
+
+  {/* LEFT → SOURCE */}
+  <div style={{
+    width: '50%',
+    borderRight: '1px solid #ccc',
+    position: 'relative',
+    overflow: 'hidden'
+  }}>
+
+    {/* SOURCE LIST */}
+    <div style={{
+      height: '100%',
+      overflow: 'auto',
+      padding: 10
+    }}>
+      <h4>Source</h4>
+
+      <FileTable
+        files={flattenTree(sourceRoot)}
+        setSelectedFile={(f) => {
+          setSelectedFile(f);
+          setPreviewSourceFile(f);
+        }}
+        openFile={openFile}
+        selectedFile={selectedFile}
+        toggleFolder={toggleSourceFolder}
+        expanded={expandedSource}
+      />
+    </div>
+
+    {/* SOURCE PREVIEW OVERLAY */}
+    {previewSourceFile && (
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: '30%',   // 🔥 leaves 30% visible list
+        width: '70%',
+        height: '100%',
+        background: '#fff',
+        borderLeft: '1px solid #ccc',
+        zIndex: 10
+      }}>
+        <button onClick={() => setPreviewSourceFile(null)}>
+          Close
+        </button>
+
+        <PreviewPane file={previewSourceFile} />
+      </div>
+    )}
+
+  </div>
+
+  {/* RIGHT → DESTINATION */}
+  <div style={{
+    width: '50%',
+    position: 'relative',
+    overflow: 'hidden'
+  }}>
+
+    {/* DEST TREE */}
+    <div style={{
+      height: '100%',
+      overflow: 'auto',
+      padding: 10
+    }}>
+
+    {/* //right  */}
+        <div style={{ padding: 10, borderBottom: '1px solid #ccc' }}>
           <h4>Destinations</h4>
-          <div>
+
+          {destinations.map(dest => (
+            <div key={dest.path}>
+              <input
+                type="checkbox"
+                checked={dest.checked}
+                onChange={() => toggleDestination(dest.path)}
+              />
+              {dest.name}
+            </div>
+          ))}
+        </div>
+
+      <h4>Destinations</h4>
+
+      {destinations.filter(d => d.checked)
+        .map(dest => (
           <DestinationTree
+            key={dest.path}
             tree={tree}
-            destRoot={destRoot}
+            destRoot={dest.path}
             expanded={expandedDest}
             toggleFolder={toggleDestFolder}
             createFolder={createFolder}
-            openFile={openFile}
+            openFile={(file) => setPreviewDestFile(file)}
           />
-          </div>
-        </div>
+        ))}
+    </div>
 
-        {/* RIGHT PANEL */}
-        <div style={{
-          flex: 1,
-          display: 'flex',
-          minHeight: 0 // 🔥 IMPORTANT
-        }}>
+    {/* DEST PREVIEW OVERLAY */}
+    {previewDestFile && (
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: '30%',
+        width: '70%',
+        height: '100%',
+        background: '#fff',
+        borderLeft: '1px solid #ccc',
+        zIndex: 10
+      }}>
+        <button onClick={() => setPreviewDestFile(null)}>
+          Close
+        </button>
 
-          {/* FILE PANEL */}
-          <div style={{
-            width: '40vw',
-            borderRight: '1px solid #ccc',
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100%',
-            overflow: 'hidden',
-            minHeight: 0
-          }}>
+        <PreviewPane file={previewDestFile} />
+      </div>
+    )}
 
-            {/* HEADER */}
-            <div style={{
-              padding: 10,
-              borderBottom: '1px solid #ccc',
-              flexShrink: 0
-            }}>
-              <h4>Files</h4>
-            </div>
+  </div>
 
-            {/* SCROLL AREA */}
-            <div style={{
-              flex: 1,
-              overflow: 'auto', // 🔥 ONLY SCROLL HERE
-              padding: 10,
-              minHeight: 0
-            }}>
-              <FileTable
-                files={flattenTree(sourceRoot)}
-                setSelectedFile={setSelectedFile}
-                openFile={openFile}
-                selectedFile={selectedFile}
-                toggleFolder={toggleSourceFolder}
-                expanded={expandedSource}
-              />
-            </div>
+</div>
 
-          </div>
-
-          {/* PREVIEW PANEL */}
-          <div style={{
-            width: '40vw',
-            overflow: 'hidden',
-            height: '100%',
-            minHeight: 0
-          }}>
-            <PreviewPane file={selectedFile} />
-          </div>
-
-        </div>
+          {/* RIGHT PANEL : make similar as per left panel but for destination folder: 
+          At starting user has to select the destination folder to view it and it should recall 
+          the last used location */}
+        
       </div>
     </div>
   );
