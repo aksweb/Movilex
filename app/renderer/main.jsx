@@ -2,14 +2,19 @@ import React, { useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import PreviewPane from './components/PreviewPane';
 import FileTable from './components/FileTable';
+import DestinationTree from './components/DestinationTree';
 
 function App() {
   const [tree, setTree] = useState({});
   const [sourceRoot, setSourceRoot] = useState(null);
   const [destRoot, setDestRoot] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState(new Set());
+  const [expandedSource, setExpandedSource] = useState(new Set());
+  const [expandedDest, setExpandedDest] = useState(new Set());
+  const [destinations, setDestinations] = useState([]);
+  const [newDestName, setNewDestName] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
+
 
   const withLoading = async (fn) => {
     if (loading) return;
@@ -37,27 +42,146 @@ function App() {
   const selectDest = async () => {
     const dir = await window.api.selectDestinationFolder();
     if (!dir) return;
+  
+    const name = newDestName || dir.split('/').pop();
+  
+    const dest = { name, path: dir };
+  
+    setDestinations(prev => [...prev, dest]);
     setDestRoot(dir);
+  
+    setNewDestName(""); // reset input
+  
+    await withLoading(async () => {
+      const children = await window.api.listDirectory(dir);
+  
+      setTree(prev => ({
+        ...prev,
+        [dir]: children
+      }));
+  
+      setExpandedDest(prev => new Set(prev).add(dir));
+    });
   };
 
-  const flattenTree = (root) => {
-    const result = [];
-
-    const dfs = (path) => {
-      const items = tree[path] || [];
-
-      for (const item of items) {
-        if (item.type === 'file') {
-          result.push(item);
-        } else if (item.type === 'folder') {
-          dfs(item.path);
+  //Expanding files and folders
+    const flattenTree = (root) => {
+      const result = [];
+    
+      const dfs = (path, depth = 0) => {
+        const items = tree[path] || [];
+    
+        for (const item of items) {
+          result.push({ ...item, depth });
+    
+          if (item.type === 'folder' && expandedSource.has(item.path)) {
+            dfs(item.path, depth + 1);
+          }
         }
-      }
+      };
+    
+      if (root) dfs(root);
+    
+      return result;
     };
 
-    if (root) dfs(root);
-    return result;
+  //create folder
+  const createFolder = async (parentPath) => {
+    try {
+      const name = prompt("Enter folder name");
+      if (!name) return;
+  
+      await window.api.createFolder({
+        parentPath,
+        name
+      });
+  
+      const children = await window.api.listDirectory(parentPath);
+  
+      setTree(prev => ({
+        ...prev,
+        [parentPath]: children
+      }));
+  
+    } catch (err) {
+      console.error("Create folder failed:", err);
+    }
   };
+
+
+  //toggling of folders
+  // const toggleFolder = async (folderPath) => {
+  //   const isExpanded = expanded.has(folderPath);
+
+  //   if (isExpanded) {
+  //     setExpanded(prev => {
+  //       const next = new Set(prev);
+  //       next.delete(folderPath);
+  //       return next;
+  //     });
+  //     return;
+  //   }
+
+  //   // lazy load
+  //   if (!tree[folderPath]) {
+  //     await withLoading(async () => {
+  //       const children = await window.api.listDirectory(folderPath);
+
+  //       setTree(prev => ({
+  //         ...prev,
+  //         [folderPath]: children
+  //       }));
+  //     });
+  //   }
+
+  //   setExpanded(prev => new Set(prev).add(folderPath));
+  // };
+  // SOURCE
+    const toggleSourceFolder = async (folderPath) => {
+      const isExpanded = expandedSource.has(folderPath);
+
+      if (isExpanded) {
+        setExpandedSource(prev => {
+          const next = new Set(prev);
+          next.delete(folderPath);
+          return next;
+        });
+        return;
+      }
+
+      if (!tree[folderPath]) {
+        await withLoading(async () => {
+          const children = await window.api.listDirectory(folderPath);
+          setTree(prev => ({ ...prev, [folderPath]: children }));
+        });
+      }
+
+      setExpandedSource(prev => new Set(prev).add(folderPath));
+    };
+
+    // DESTINATION
+    const toggleDestFolder = async (folderPath) => {
+      const isExpanded = expandedDest.has(folderPath);
+
+      if (isExpanded) {
+        setExpandedDest(prev => {
+          const next = new Set(prev);
+          next.delete(folderPath);
+          return next;
+        });
+        return;
+      }
+
+      if (!tree[folderPath]) {
+        await withLoading(async () => {
+          const children = await window.api.listDirectory(folderPath);
+          setTree(prev => ({ ...prev, [folderPath]: children }));
+        });
+      }
+
+      setExpandedDest(prev => new Set(prev).add(folderPath));
+    };
+
 
   const openFile = async (file) => {
     await window.api.openFile(file.path || file.original_path);
@@ -109,11 +233,24 @@ function App() {
         }}>
           <button onClick={selectSource}>Select Source</button>
           <br />
-          <button onClick={selectDest}>Create Destination</button>
+          {/* <button onClick={selectDest}>Create Destination</button> */}
+          <div>
+            <input
+              type="text"
+              placeholder="Destination name"
+              value={newDestName}
+              onChange={(e) => setNewDestName(e.target.value)}
+            />
+
+            <button onClick={selectDest}>
+              Create Destination
+            </button>
+          </div>
 
           <div style={{ marginTop: 10 }}>
             <div>Source: {sourceRoot || "-"}</div>
-            <div>Dest: {destRoot || "-"}</div>
+            <div> Dest: { destinations.find(d => d.path === destRoot)?.name || "-" }
+            </div>
           </div>
         </div>
 
@@ -140,7 +277,16 @@ function App() {
           minHeight: 0
         }}>
           <h4>Destinations</h4>
-          <div>Coming soon...</div>
+          <div>
+          <DestinationTree
+            tree={tree}
+            destRoot={destRoot}
+            expanded={expandedDest}
+            toggleFolder={toggleDestFolder}
+            createFolder={createFolder}
+            openFile={openFile}
+          />
+          </div>
         </div>
 
         {/* RIGHT PANEL */}
@@ -182,6 +328,8 @@ function App() {
                 setSelectedFile={setSelectedFile}
                 openFile={openFile}
                 selectedFile={selectedFile}
+                toggleFolder={toggleSourceFolder}
+                expanded={expandedSource}
               />
             </div>
 

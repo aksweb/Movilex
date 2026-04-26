@@ -1,6 +1,13 @@
 import React from 'react';
 
-function FileTable({ files, setSelectedFile, openFile, selectedFile }) {
+function FileTable({
+  files,
+  setSelectedFile,
+  openFile,
+  selectedFile,
+  toggleFolder,
+  expanded
+}) {
 
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
@@ -18,24 +25,59 @@ function FileTable({ files, setSelectedFile, openFile, selectedFile }) {
       <tbody>
         {files.map(file => {
           const isSelected = selectedFile?.path === file.path;
+          const isFolder = file.type === 'folder';
 
           return (
             <tr
               key={file.path}
-              onClick={() => setSelectedFile(file)}
-              onDoubleClick={() => openFile(file)}
+              onClick={() => {
+                if (!isFolder) {
+                  setSelectedFile(file);
+                }
+              }}
+              onDoubleClick={() => {
+                if (!isFolder) {
+                  openFile(file);
+                }
+              }}
               style={{
                 cursor: 'pointer',
                 borderBottom: '1px solid #eee',
-                backgroundColor: isSelected ? '#dbeafe' : 'transparent' // 🔵 highlight
+                backgroundColor: isSelected ? '#dbeafe' : 'transparent'
               }}
             >
-              {/* NAME (wrapped properly) */}
-              <td style={{
-                wordBreak: 'break-word',
-                whiteSpace: 'normal',
-                overflowWrap: 'anywhere'
-              }}>
+              {/* NAME COLUMN */}
+              <td
+                style={{
+                  wordBreak: 'break-word',
+                  whiteSpace: 'normal',
+                  overflowWrap: 'anywhere',
+                  paddingLeft: `${file.depth * 14}px`,
+                  fontWeight: isFolder ? '600' : 'normal'
+                }}
+              >
+                {/* TOGGLE ICON */}
+                {isFolder && (
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation(); // 🔥 prevent row click
+                      toggleFolder(file.path);
+                    }}
+                    style={{
+                      marginRight: 6,
+                      cursor: 'pointer',
+                      userSelect: 'none'
+                    }}
+                  >
+                    {expanded.has(file.path) ? '▼' : '▶'}
+                  </span>
+                )}
+
+                {/* FILE/FOLDER ICON */}
+                <span style={{ marginRight: 6 }}>
+                  {isFolder ? '📁' : '📄'}
+                </span>
+
                 {file.name}
               </td>
 

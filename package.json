@@ -1,5 +1,5 @@
 {
-  "name": "triagedesk",
+  "name": "TreeFileManager",
   "version": "1.0.0",
   "description": "\"file manager for prof\"",
   "main": "app/main/main.js",
