@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import PreviewPane from './components/PreviewPane';
 import FileTable from './components/FileTable';
 import DestinationTree from './components/DestinationTree';
+import ContextMenu from './components/ContextMenu';
 
 function App() {
   const [tree, setTree] = useState({});
@@ -22,6 +23,9 @@ function App() {
 
   const [destinations, setDestinations] = useState([]);
   const [newDestName, setNewDestName] = useState("");
+
+  const [contextMenu, setContextMenu] = useState(null);     /* { x, y, file } */
+
 
   // ---------------- LOADER ----------------
   const withLoading = async (fn) => {
@@ -164,6 +168,38 @@ function App() {
   const openFile = async (file) => {
     await window.api.openFile(file.path || file.original_path);
   };
+  // --------------- MOVE HANDLER ---------------
+  const moveFileToDestination = async (file, destFolderPath) => {
+    const sourcePath = file.path || file.original_path;
+  
+    if (!sourcePath || !destFolderPath) {
+      console.error("Invalid move params:", { file, destFolderPath });
+      return;
+    }
+  
+    const res = await window.api.moveFile({
+      sourcePath,
+      destinationPath: destFolderPath
+    });
+  
+    if (!res?.success) {
+      console.error("Move failed:", res?.error);
+      return;
+    }
+  
+    // refresh destination
+    const destChildren = await window.api.listDirectory(destFolderPath);
+  
+    // refresh source parent
+    const sourceParent = sourcePath.substring(0, sourcePath.lastIndexOf('/'));
+    const sourceChildren = await window.api.listDirectory(sourceParent);
+  
+    setTree(prev => ({
+      ...prev,
+      [destFolderPath]: destChildren,
+      [sourceParent]: sourceChildren
+    }));
+  };
 
   // ---------------- UI ----------------
   return (
@@ -245,7 +281,13 @@ function App() {
               selectedFile={selectedSourceFile}
               toggleFolder={toggleSourceFolder}
               expanded={expandedSource}
-              onPreview={setPreviewSourceFile}
+              onPreview={(file, event) => {
+                setContextMenu({
+                  x: event.clientX,
+                  y: event.clientY,
+                  file
+                });
+              }}
             />
           </div>
 
@@ -327,6 +369,22 @@ function App() {
         </div>
 
       </div>
+
+         {/* ContextMenu */}
+      <ContextMenu
+        menu={contextMenu}
+        destinations={destinations}
+        tree={tree}
+        onClose={() => setContextMenu(null)}
+        onPreview={(file) => {
+          if (selectedSourceFile?.path === file.path) {
+            setPreviewSourceFile(file);
+          } else {
+            setPreviewDestFile(file);
+          }
+        }}
+        onMove={moveFileToDestination}
+      />
     </div>
   );
 }
