@@ -6,13 +6,12 @@ function FileTable({
   openFile,
   selectedFile,
   toggleFolder,
-  expanded
+  expanded,
+  onPreview
 }) {
-
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
       
-      {/* HEADER */}
       <thead>
         <tr style={{ borderBottom: '1px solid #ccc' }}>
           <th style={{ width: '60%', textAlign: 'left' }}>Name</th>
@@ -21,23 +20,26 @@ function FileTable({
         </tr>
       </thead>
 
-      {/* BODY */}
       <tbody>
-        {files.map(file => {
-          const isSelected = selectedFile?.path === file.path;
-          const isFolder = file.type === 'folder';
+        {files.map(item => {
+          const isSelected = selectedFile?.path === item.path;
+          const isFolder = item.type === 'folder';
+          const isOpen = expanded.has(item.path);
 
           return (
             <tr
-              key={file.path}
+              key={item.path}
               onClick={() => {
-                if (!isFolder) {
-                  setSelectedFile(file);
-                }
+                setSelectedFile(item); // ✅ select
+                if (isFolder) toggleFolder(item.path); // optional expand
               }}
               onDoubleClick={() => {
-                if (!isFolder) {
-                  openFile(file);
+                if (!isFolder) openFile(item); // ✅ open system app
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                if (!isFolder && onPreview) {
+                  onPreview(item); // ✅ preview
                 }
               }}
               style={{
@@ -46,50 +48,41 @@ function FileTable({
                 backgroundColor: isSelected ? '#dbeafe' : 'transparent'
               }}
             >
-              {/* NAME COLUMN */}
+              {/* NAME */}
               <td
                 style={{
                   wordBreak: 'break-word',
-                  whiteSpace: 'normal',
                   overflowWrap: 'anywhere',
-                  paddingLeft: `${file.depth * 14}px`,
-                  fontWeight: isFolder ? '600' : 'normal'
+                  paddingLeft: `${item.depth * 14}px`,
+                  fontWeight: isFolder ? 600 : 400
                 }}
               >
-                {/* TOGGLE ICON */}
                 {isFolder && (
                   <span
                     onClick={(e) => {
-                      e.stopPropagation(); // 🔥 prevent row click
-                      toggleFolder(file.path);
+                      e.stopPropagation();
+                      toggleFolder(item.path);
                     }}
-                    style={{
-                      marginRight: 6,
-                      cursor: 'pointer',
-                      userSelect: 'none'
-                    }}
+                    style={{ marginRight: 6, cursor: 'pointer' }}
                   >
-                    {expanded.has(file.path) ? '▼' : '▶'}
+                    {isOpen ? '▼' : '▶'}
                   </span>
                 )}
 
-                {/* FILE/FOLDER ICON */}
                 <span style={{ marginRight: 6 }}>
                   {isFolder ? '📁' : '📄'}
                 </span>
 
-                {file.name}
+                {item.name}
               </td>
 
               {/* TYPE */}
-              <td>
-                {file.type}
-              </td>
+              <td>{item.type}</td>
 
               {/* MODIFIED */}
               <td>
-                {file.modified
-                  ? new Date(file.modified).toLocaleString()
+                {item.modified
+                  ? new Date(item.modified).toLocaleString()
                   : '-'}
               </td>
             </tr>

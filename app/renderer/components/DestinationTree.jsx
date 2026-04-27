@@ -6,11 +6,14 @@ function DestinationTree({
   expanded,
   toggleFolder,
   createFolder,
-  openFile
+  selectedFile,
+  setSelectedFile,
+  openFile,
+  onPreview
 }) {
 
   if (!destRoot) {
-    return <div>Select a destination</div>;
+    return <div>No destination selected</div>;
   }
 
   const renderNode = (path, depth = 0) => {
@@ -19,46 +22,44 @@ function DestinationTree({
     return items.map(item => {
       const isFolder = item.type === 'folder';
       const isOpen = expanded.has(item.path);
+      const isSelected = selectedFile?.path === item.path;
 
       return (
         <div key={item.path}>
 
-          {/* ROW */}
           <div
             onClick={() => {
-              if (isFolder) {
-                toggleFolder(item.path);
-              }
+              setSelectedFile(item);              // ✅ highlight works
+              if (isFolder) toggleFolder(item.path);
             }}
+
             onDoubleClick={() => {
-              if (!isFolder) {
-                openFile(item);
-              }
+              if (!isFolder) openFile(item);      // ✅ open system app
             }}
+
             onContextMenu={(e) => {
               e.preventDefault();
-
-              if (isFolder) {
-                createFolder(item.path);
+              if (!isFolder && onPreview) {
+                onPreview(item);                  // ✅ preview works
               }
             }}
+
             style={{
-              paddingLeft: depth * 12,
+              paddingLeft: depth * 14,
               cursor: 'pointer',
               userSelect: 'none',
               fontWeight: isFolder ? 600 : 400,
-              display: 'flex',
-              alignItems: 'center'
+              backgroundColor: isSelected ? '#dbeafe' : 'transparent' // 🔥 highlight
             }}
           >
-            {/* TOGGLE */}
+            {/* toggle */}
             {isFolder && (
               <span style={{ marginRight: 6 }}>
                 {isOpen ? '▼' : '▶'}
               </span>
             )}
 
-            {/* ICON */}
+            {/* icon */}
             <span style={{ marginRight: 6 }}>
               {isFolder ? '📁' : '📄'}
             </span>
@@ -66,7 +67,7 @@ function DestinationTree({
             {item.name}
           </div>
 
-          {/* CHILDREN */}
+          {/* children */}
           {isFolder && isOpen && renderNode(item.path, depth + 1)}
 
         </div>
@@ -75,8 +76,7 @@ function DestinationTree({
   };
 
   return (
-    <div style={{ overflow: 'auto', height: '100%' }}>
-      <h4>Destinations</h4>
+    <div>
       {renderNode(destRoot)}
     </div>
   );
