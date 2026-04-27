@@ -39,9 +39,9 @@ function FileTable({
               onContextMenu={(e) => {
                 e.preventDefault();
                 if (!isFolder && onPreview) {
-                  onPreview(item); // ✅ preview
+                    onPreview(item, e); // 🔥 pass event
                 }
-              }}
+                }}
               style={{
                 cursor: 'pointer',
                 borderBottom: '1px solid #eee',

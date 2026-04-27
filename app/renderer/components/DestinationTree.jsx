@@ -38,11 +38,11 @@ function DestinationTree({
             }}
 
             onContextMenu={(e) => {
-              e.preventDefault();
-              if (!isFolder && onPreview) {
-                onPreview(item);                  // ✅ preview works
-              }
-            }}
+                e.preventDefault();
+                if (!isFolder && onPreview) {
+                    onPreview(item, e);
+                }
+                }}
 
             style={{
               paddingLeft: depth * 14,

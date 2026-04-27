@@ -1,14 +1,14 @@
-const { ipcMain, dialog } = require('electron');
+const { ipcMain, dialog, shell } = require('electron');
 const scanDirectory = require('../services/scanService');
 const dbService = require('../services/dbService');
 const fs = require('fs');
 
-const fileService = require('../services/fileService');
+const { moveFile } = require('../services/fileService'); // ✅ FIX
 const { listDirectory } = require('../services/treeService');
-//to directly open files using default app opener.
-const { shell } = require('electron');
 
 function registerFileIpc() {
+
+  // ---------------- SELECT SOURCE ----------------
   ipcMain.handle('select-folder', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory']
@@ -18,43 +18,51 @@ function registerFileIpc() {
     return result.filePaths[0];
   });
 
+  // ---------------- SCAN ----------------
   ipcMain.handle('scan-directory', async (_, { sourceRoot, destRoot }) => {
     dbService.clearFiles();
-  
+
     const files = await scanDirectory(sourceRoot);
     dbService.insertFiles(files, sourceRoot, destRoot);
-  
+
     return { inserted: files.length };
   });
 
+  // ---------------- SELECT DEST ----------------
   ipcMain.handle('select-dest-folder', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory']
     });
-  
+
     if (result.canceled) return null;
     return result.filePaths[0];
   });
 
+  // ---------------- DB ----------------
   ipcMain.handle('get-files', async () => {
     return dbService.getFiles();
   });
 
-  //move files as per category
-  ipcMain.handle('move-file', async (_, { id, path, category, destRoot }) => {
-    const newPath = await fileService.moveFile(path, category, destRoot);
-  
-    dbService.updateFileStatus(id, category, newPath);
-  
-    return { success: true };
+  // ---------------- MOVE FILE ----------------
+  ipcMain.handle('move-file', async (_, { sourcePath, destinationPath }) => {
+    try {
+      console.log("MOVE DEBUG:", { sourcePath, destinationPath }); // 🔥 keep for now
+
+      const result = await moveFile(sourcePath, destinationPath);
+
+      return { success: true, path: result };
+    } catch (e) {
+      console.error('move-file error:', e);
+      return { success: false, error: e.message };
+    }
   });
 
-  //list directory
+  // ---------------- LIST ----------------
   ipcMain.handle('list-directory', async (_, dirPath) => {
     return await listDirectory(dirPath);
   });
 
-  //open using default file opener
+  // ---------------- OPEN ----------------
   ipcMain.handle('open-file', async (_, filePath) => {
     try {
       await shell.openPath(filePath);
@@ -64,6 +72,7 @@ function registerFileIpc() {
     }
   });
 
+  // ---------------- READ ----------------
   ipcMain.handle('read-file', async (_, filePath) => {
     try {
       const data = await fs.promises.readFile(filePath);
@@ -72,7 +81,6 @@ function registerFileIpc() {
       return null;
     }
   });
-
 }
 
 module.exports = registerFileIpc;
