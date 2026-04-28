@@ -38,6 +38,18 @@ function App() {
     }
   };
 
+  // lazy loader
+  const loadFolder = async (folderPath) => {
+    if (tree[folderPath]) return;
+  
+    const children = await window.api.listDirectory(folderPath);
+  
+    setTree(prev => ({
+      ...prev,
+      [folderPath]: children
+    }));
+  };
+
   // ---------------- SOURCE ----------------
   const selectSource = async () => {
     const dir = await window.api.selectFolder();
@@ -384,6 +396,8 @@ function App() {
           }
         }}
         onMove={moveFileToDestination}
+        loadFolder={loadFolder}
+
       />
     </div>
   );
