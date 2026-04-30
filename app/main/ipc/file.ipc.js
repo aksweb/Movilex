@@ -3,7 +3,7 @@ const scanDirectory = require('../services/scanService');
 const dbService = require('../services/dbService');
 const fs = require('fs');
 
-const { moveFile } = require('../services/fileService'); // ✅ FIX
+const fileService = require('../services/fileService');
 const { listDirectory } = require('../services/treeService');
 
 function registerFileIpc() {
@@ -43,20 +43,6 @@ function registerFileIpc() {
     return dbService.getFiles();
   });
 
-  // ---------------- MOVE FILE ----------------
-  ipcMain.handle('move-file', async (_, { sourcePath, destinationPath }) => {
-    try {
-      console.log("MOVE DEBUG:", { sourcePath, destinationPath }); // 🔥 keep for now
-
-      const result = await moveFile(sourcePath, destinationPath);
-
-      return { success: true, path: result };
-    } catch (e) {
-      console.error('move-file error:', e);
-      return { success: false, error: e.message };
-    }
-  });
-
   // ---------------- LIST ----------------
   ipcMain.handle('list-directory', async (_, dirPath) => {
     return await listDirectory(dirPath);
@@ -80,6 +66,76 @@ function registerFileIpc() {
     } catch (err) {
       return null;
     }
+  });
+
+  //folder actions
+  ipcMain.handle('file-action', async (_, payload) => {
+    try {
+      switch (payload.action) {
+  
+        case 'move': {
+          const { sourcePath, targetPath } = payload;
+  
+          if (!sourcePath || !targetPath) {
+            throw new Error("Invalid move params");
+          }
+  
+          const result = await fileService.moveFile(
+            sourcePath,
+            targetPath
+          );
+  
+          return { success: true, path: result };
+        }
+  
+        case 'create-folder': {
+          const { targetPath, name } = payload;
+  
+          if (!targetPath || !name) {
+            throw new Error("Invalid create-folder params");
+          }
+  
+          const result = await fileService.createFolder(
+            targetPath,
+            name
+          );
+  
+          return { success: true, path: result };
+        }
+  
+        case 'delete': {
+          const { targetPath } = payload;
+  
+          if (!targetPath) {
+            throw new Error("Invalid delete params");
+          }
+  
+          await fileService.deletePath(targetPath);
+  
+          return { success: true };
+        }
+  
+        default:
+          throw new Error("Unknown action: " + payload.action);
+      }
+  
+    } catch (e) {
+      console.error("file-action error:", e);
+      return { success: false, error: e.message };
+    }
+  });
+
+  //folder creation
+  ipcMain.handle('prompt-folder-name', async () => {
+    const { response, checkboxChecked } = await dialog.showMessageBox({
+      type: 'question',
+      buttons: ['OK'],
+      title: 'Create Folder',
+      message: 'Enter folder name in console (temporary)',
+    });
+  
+    // ❌ Electron has no native input dialog
+    // so this is just placeholder unless you build UI
   });
 }
 
