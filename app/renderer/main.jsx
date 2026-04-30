@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import PreviewPane from './components/PreviewPane';
-import FileTable from './components/FileTable';
-import DestinationTree from './components/DestinationTree';
+import SourcePannel from './components/SourcePannel';
+import DestinationPanel from './components/DestinationPanel';
 import ContextMenu from './components/ContextMenu';
+import { handleFileAction } from './utils/fileActions';
 
 function App() {
   const [tree, setTree] = useState({});
@@ -181,38 +182,9 @@ function App() {
     await window.api.openFile(file.path || file.original_path);
   };
   // --------------- MOVE HANDLER ---------------
-  const moveFileToDestination = async (file, destFolderPath) => {
-    const sourcePath = file.path || file.original_path;
-  
-    if (!sourcePath || !destFolderPath) {
-      console.error("Invalid move params:", { file, destFolderPath });
-      return;
-    }
-  
-    const res = await window.api.moveFile({
-      sourcePath,
-      destinationPath: destFolderPath
-    });
-  
-    if (!res?.success) {
-      console.error("Move failed:", res?.error);
-      return;
-    }
-  
-    // refresh destination
-    const destChildren = await window.api.listDirectory(destFolderPath);
-  
-    // refresh source parent
-    const sourceParent = sourcePath.substring(0, sourcePath.lastIndexOf('/'));
-    const sourceChildren = await window.api.listDirectory(sourceParent);
-  
-    setTree(prev => ({
-      ...prev,
-      [destFolderPath]: destChildren,
-      [sourceParent]: sourceChildren
-    }));
+  const handleAction = (payload) => {
+    handleFileAction(payload, { setTree });
   };
-
   // ---------------- UI ----------------
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -249,16 +221,15 @@ function App() {
           </div>
 
           <div style={{ marginTop: 10 }}>
-            <div>Source: {sourceRoot || "-"}</div>
-            <div>
-              Dest: {destinations.find(d => d.path === destRoot)?.name || "-"}
-            </div>
+            
           </div>
         </div>
 
         <div style={{ flex: 1, padding: 10 }}>
-          <button>Show Source Files</button>
-          <button style={{ marginLeft: 10 }}>Show Destination Files</button>
+        <div>Source: {sourceRoot || "-"}</div>
+            <div>
+              Dest: {destinations.find(d => d.path === destRoot)?.name || "-"}
+            </div>
         </div>
       </div>
 
@@ -286,21 +257,58 @@ function App() {
             }}>
             <h4>Source</h4>
 
-            <FileTable
-              files={flattenTree(sourceRoot)}
-              setSelectedFile={setSelectedSourceFile}
-              openFile={openFile}
-              selectedFile={selectedSourceFile}
-              toggleFolder={toggleSourceFolder}
-              expanded={expandedSource}
-              onPreview={(file, event) => {
-                setContextMenu({
-                  x: event.clientX,
-                  y: event.clientY,
-                  file
+            <div
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+
+                let data;
+                try {
+                  data = JSON.parse(
+                    e.dataTransfer.getData('application/json')
+                  );
+                } catch {
+                  return;
+                }
+
+                //Fix of File got moved on drag but getting error due  to source to source
+                if (!data?.path || !sourceRoot) return;
+
+                const fileName = data.path.split('/').pop();
+                const finalTarget = `${sourceRoot}/${fileName}`;
+
+                // 🔴 SAME PATH
+                if (data.path === finalTarget) return;
+
+                // 🔴 moving folder into itself
+                if (data.path.startsWith(sourceRoot + '/')) return;
+                ////
+
+                handleAction({
+                  action: "move",
+                  sourcePath: data.path,
+                  targetPath: sourceRoot
                 });
               }}
-            />
+            >
+              <SourcePannel
+                files={flattenTree(sourceRoot)}
+                setSelectedFile={setSelectedSourceFile}
+                openFile={openFile}
+                selectedFile={selectedSourceFile}
+                toggleFolder={toggleSourceFolder}
+                expanded={expandedSource}
+                onMove={handleAction}
+                onPreview={(file, event, origin) => {
+                  setContextMenu({
+                    x: event.clientX,
+                    y: event.clientY,
+                    file,
+                    origin
+                  });
+                }}
+              />
+            </div>
           </div>
 
           {previewSourceFile && (
@@ -349,7 +357,7 @@ function App() {
               minHeight: 0
             }}>
             {destinations.filter(d => d.checked).map(dest => (
-              <DestinationTree
+              <DestinationPanel
                 key={dest.path}
                 tree={tree}
                 destRoot={dest.path}
@@ -359,7 +367,15 @@ function App() {
                 selectedFile={selectedDestFile}
                 setSelectedFile={setSelectedDestFile}
                 openFile={openFile}
-                onPreview={setPreviewDestFile}
+                onPreview={(file, event, origin) => {
+                  setContextMenu({
+                    x: event.clientX,
+                    y: event.clientY,
+                    file,
+                    origin
+                  });
+                }}
+                onMove={handleAction}
               />
             ))}
           </div>
@@ -383,22 +399,21 @@ function App() {
       </div>
 
          {/* ContextMenu */}
-      <ContextMenu
-        menu={contextMenu}
-        destinations={destinations}
-        tree={tree}
-        onClose={() => setContextMenu(null)}
-        onPreview={(file) => {
-          if (selectedSourceFile?.path === file.path) {
-            setPreviewSourceFile(file);
-          } else {
-            setPreviewDestFile(file);
-          }
-        }}
-        onMove={moveFileToDestination}
-        loadFolder={loadFolder}
-
-      />
+         <ContextMenu
+            menu={contextMenu}
+            destinations={destinations}
+            tree={tree}
+            onClose={() => setContextMenu(null)}
+            onPreview={(file) => {
+              if (selectedSourceFile?.path === file.path) {
+                setPreviewSourceFile(file);
+              } else {
+                setPreviewDestFile(file);
+              }
+            }}
+            onMove={handleAction}
+            loadFolder={loadFolder}
+          />
     </div>
   );
 }

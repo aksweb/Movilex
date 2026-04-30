@@ -1,7 +1,17 @@
-import React, { useState } from 'react';
+// ContextMenu.jsx
+import React, { useEffect } from 'react';
 
 const MENU_WIDTH = 260;
 const MENU_HEIGHT = 360;
+
+const getFilePath = (file) => {
+  return (
+    file?.path ||
+    file?.original_path ||
+    file?.sourcePath ||
+    null
+  );
+};
 
 function ContextMenu({
   menu,
@@ -9,19 +19,27 @@ function ContextMenu({
   tree,
   onClose,
   onPreview,
-  onMove,
+  onMove,            // 🔥 now acts as dispatcher
   loadFolder
 }) {
   if (!menu) return null;
 
-  const { x, y, file } = menu;
+  const { x, y, file, origin } = menu;
+  const isFolder = file?.type === 'folder';
 
-  // clamp root menu inside viewport
   const posX = Math.min(x, window.innerWidth - MENU_WIDTH * 2);
   const posY = Math.min(y, window.innerHeight - MENU_HEIGHT);
 
+  // 🔥 close on outside click
+  useEffect(() => {
+    const handleClick = () => onClose();
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, []);
+
   return (
     <div
+      onClick={(e) => e.stopPropagation()}
       style={{
         position: 'fixed',
         top: posY,
@@ -35,22 +53,51 @@ function ContextMenu({
         maxHeight: MENU_HEIGHT,
         overflowY: 'auto'
       }}
-      onMouseLeave={onClose}
-
     >
-      {/* PREVIEW */}
+      {/* ---------- PREVIEW (file only) ---------- */}
+      {!isFolder && (
+        <MenuItem
+          onClick={() => {
+            onPreview(file);
+            onClose();
+          }}
+        >
+          Preview
+        </MenuItem>
+      )}
+
+      {/* ---------- CREATE FOLDER (folder only) ---------- */}
+      {isFolder && (
+        <MenuItem
+          onClick={() => {
+            onMove({
+              action: "open-create-folder", // 🔥 let main handle modal
+              targetPath: file.path
+            });
+            onClose();
+          }}
+        >
+          Create Folder
+        </MenuItem>
+      )}
+
+      {/* ---------- DELETE (file + folder) ---------- */}
       <MenuItem
+        style={{ color: 'red' }}
         onClick={() => {
-          onPreview(file);
+          onMove({
+            action: "delete",
+            targetPath: file.path
+          });
           onClose();
         }}
       >
-        Preview
+        Delete
       </MenuItem>
 
       <Divider />
 
-      {/* DESTINATIONS */}
+      {/* ---------- MOVE DESTINATIONS ---------- */}
       {destinations.map(dest => (
         <HoverFolder
           key={dest.path}
@@ -69,28 +116,52 @@ function ContextMenu({
 export default ContextMenu;
 
 //
-// 🔥 RECURSIVE HOVER MENU
+// 🔥 RECURSIVE DESTINATION TREE
 //
 
 function HoverFolder({ folder, tree, depth, file, onMove, loadFolder }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = React.useState(false);
 
   const children = (tree[folder.path] || []).filter(
     item => item.type === 'folder'
   );
 
-  const handleToggle = async () => {
+  const handleClick = async () => {
     if (!tree[folder.path] && loadFolder) {
       await loadFolder(folder.path);
     }
     setOpen(prev => !prev);
   };
 
+  const handleDrop = (e) => {
+    e.preventDefault();
+
+    const data = JSON.parse(
+      e.dataTransfer.getData('application/json')
+    );
+
+    const sourcePath = getFilePath(data);
+
+    if (!sourcePath || !folder.path) return;
+
+    // 🔥 guards
+    if (sourcePath === folder.path) return;
+    if (sourcePath.startsWith(folder.path + '/')) return;
+
+    onMove({
+      action: "move",
+      sourcePath,
+      targetPath: folder.path
+    });
+  };
+
   return (
-    <div>
-      {/* Folder row */}
+    <div
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={handleDrop}
+    >
       <MenuItem
-        onClick={handleToggle}
+        onClick={handleClick}
         style={{
           paddingLeft: depth * 14,
           fontWeight: 500
@@ -100,22 +171,29 @@ function HoverFolder({ folder, tree, depth, file, onMove, loadFolder }) {
         📁 {folder.name}
       </MenuItem>
 
-      {/* Expanded content */}
       {open && (
         <div>
-          {/* Move option */}
+          {/* MOVE HERE */}
           <MenuItem
             style={{
               paddingLeft: (depth + 1) * 14,
               color: '#2563eb',
               fontWeight: 'bold'
             }}
-            onClick={() => onMove(file, folder.path)}
+            onClick={() => {
+              const sourcePath = getFilePath(file);
+              if (!sourcePath || !folder.path) return;
+
+              onMove({
+                action: "move",
+                sourcePath,
+                targetPath: folder.path
+              });
+            }}
           >
             → Move here
           </MenuItem>
 
-          {/* Children */}
           {children.map(child => (
             <HoverFolder
               key={child.path}
