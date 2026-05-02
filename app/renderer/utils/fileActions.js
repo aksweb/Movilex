@@ -1,5 +1,5 @@
 export async function handleFileAction(payload, ctx) {
-    const { setTree } = ctx;
+    const { setTree } = ctx;  
   
     try {
       if (!payload.action) {
@@ -85,6 +85,37 @@ export async function handleFileAction(payload, ctx) {
   
         const updated = await window.api.listDirectory(targetPath);
   
+        setTree(prev => ({
+          ...prev,
+          [targetPath]: updated
+        }));
+      }
+      else if (payload.action === "paste") {
+        const { targetPath, clipboard } = payload;
+      
+        if (!clipboard?.items?.length) return;
+      
+        for (const sourcePath of clipboard.items) {
+      
+          if (clipboard.type === "cut") {
+            await window.api.fileAction({
+              action: "move",
+              sourcePath,
+              targetPath
+            });
+          }
+      
+          else if (clipboard.type === "copy") {
+            await window.api.fileAction({
+              action: "copy",
+              sourcePath,
+              targetPath
+            });
+          }
+        }
+      
+        const updated = await window.api.listDirectory(targetPath);
+      
         setTree(prev => ({
           ...prev,
           [targetPath]: updated

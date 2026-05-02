@@ -20,7 +20,10 @@ function ContextMenu({
   onClose,
   onPreview,
   onMove,            // 🔥 now acts as dispatcher
-  loadFolder
+  loadFolder,
+  setCreatingFolder,
+  clipboard,
+  setClipboard
 }) {
   if (!menu) return null;
 
@@ -36,6 +39,13 @@ function ContextMenu({
     window.addEventListener('click', handleClick);
     return () => window.removeEventListener('click', handleClick);
   }, []);
+
+  //for activating pasting on current directory also
+  function getParentPath(p) {
+    if (!p) return null;
+    const idx = p.lastIndexOf('/');
+    return idx === -1 ? p : p.slice(0, idx);
+  }
 
   return (
     <div
@@ -70,9 +80,10 @@ function ContextMenu({
       {isFolder && (
         <MenuItem
           onClick={() => {
-            onMove({
-              action: "open-create-folder", // 🔥 let main handle modal
-              targetPath: file.path
+            console.log("CREATE CLICK FIRED");   // 🔴 DEBUG
+            setCreatingFolder({
+              parentPath: file.path,
+              tempId: "temp-" + Date.now()
             });
             onClose();
           }}
@@ -94,6 +105,48 @@ function ContextMenu({
       >
         Delete
       </MenuItem>
+
+      {/* COPY AND CUT MENU ITEM */}
+      <MenuItem
+        onClick={() => {
+          setClipboard({
+            type: "copy",
+            items: [file.path]
+          });
+          onClose();
+        }}
+      >
+        Copy
+      </MenuItem>
+
+      <MenuItem
+        onClick={() => {
+          setClipboard({
+            type: "cut",
+            items: [file.path]
+          });
+          onClose();
+        }}
+      >
+        Cut
+      </MenuItem>
+
+      {/* PASTE MENU */}
+      {clipboard && (
+      <MenuItem
+        style={{ color: '#22c55e', fontWeight: 'bold' }}
+        onClick={() => {
+          onMove({
+            action: "paste",
+            targetPath: isFolder ? file.path : getParentPath(file.path),
+            clipboard
+          });
+          onClose();
+        }}
+      >
+        Paste
+      </MenuItem>
+    )}
 
       <Divider />
 

@@ -10,7 +10,9 @@ function DestinationPanel({
   setSelectedFile,
   openFile,
   onPreview,
-  onMove
+  onMove,
+  creatingFolder,    // 🔥 ADD
+  setCreatingFolder,  // 🔥 ADD
 }) {
   if (!destRoot) {
     return <div>No destination selected</div>;
@@ -31,6 +33,8 @@ function DestinationPanel({
           openFile={openFile}
           onPreview={onPreview}
           onMove={onMove}
+          creatingFolder={creatingFolder}        // 🔥 ADD
+          setCreatingFolder={setCreatingFolder}  // 🔥 ADD
         />
       ))}
     </div>

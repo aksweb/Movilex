@@ -114,6 +114,17 @@ function registerFileIpc() {
   
           return { success: true };
         }
+
+        case 'copy': {
+          const { sourcePath, targetPath } = payload;
+        
+          const result = await fileService.copyPath(
+            sourcePath,
+            targetPath
+          );
+        
+          return { success: true, path: result };
+        }
   
         default:
           throw new Error("Unknown action: " + payload.action);
@@ -138,5 +149,7 @@ function registerFileIpc() {
     // so this is just placeholder unless you build UI
   });
 }
+
+
 
 module.exports = registerFileIpc;
