@@ -5,6 +5,8 @@ import SourcePannel from './components/SourcePannel';
 import DestinationPanel from './components/DestinationPanel';
 import ContextMenu from './components/ContextMenu';
 import { handleFileAction } from './utils/fileActions';
+// import './styles/themes.css'
+// import './components/css/panel.css'
 
 function App() {
   const [tree, setTree] = useState({});
@@ -255,7 +257,10 @@ function App() {
               padding: 10,
               minHeight: 0         // 🔥 prevents overflow
             }}>
-            <h4>Source</h4>
+            <div className="explorer">
+
+              <div className="panel-header">Source</div>
+            {/* <h4>Source</h4> */}
 
             <div
               onDragOver={(e) => e.preventDefault()}
@@ -308,6 +313,7 @@ function App() {
                   });
                 }}
               />
+            </div>
             </div>
           </div>
 

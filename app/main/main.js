@@ -1,7 +1,7 @@
 // app/main/main.js
+// import '../renderer/styles/themes.css'
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
-
 //ipc
 const registerFileIpc = require('./ipc/file.ipc');
 
