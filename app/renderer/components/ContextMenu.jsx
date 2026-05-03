@@ -1,6 +1,7 @@
-// ContextMenu.jsx
-import React, { useEffect } from 'react';
+// ContextMenu.jsx (Dont remove this file name)
 
+import React, { useEffect } from 'react';
+import { theme } from '../styles/theme';
 const MENU_WIDTH = 260;
 const MENU_HEIGHT = 360;
 
@@ -23,11 +24,13 @@ function ContextMenu({
   loadFolder,
   setCreatingFolder,
   clipboard,
-  setClipboard
+  setClipboard,
+  currentPath
 }) {
   if (!menu) return null;
 
   const { x, y, file, origin } = menu;
+  const isContainer = file?.isContainer;
   const isFolder = file?.type === 'folder';
 
   const posX = Math.min(x, window.innerWidth - MENU_WIDTH * 2);
@@ -55,8 +58,9 @@ function ContextMenu({
         top: posY,
         left: posX,
         width: MENU_WIDTH,
-        background: '#fff',
-        border: '1px solid #ccc',
+        background: theme.sidebar,
+        border: `1px solid ${theme.border}`,
+        color: theme.text,
         zIndex: 1000,
         boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
         padding: 6,
@@ -77,7 +81,7 @@ function ContextMenu({
       )}
 
       {/* ---------- CREATE FOLDER (folder only) ---------- */}
-      {isFolder && (
+      {(isFolder || isContainer) && (
         <MenuItem
           onClick={() => {
             console.log("CREATE CLICK FIRED");   // 🔴 DEBUG
@@ -96,9 +100,9 @@ function ContextMenu({
       <MenuItem
         style={{ color: 'red' }}
         onClick={() => {
-          onMove({
-            action: "delete",
-            targetPath: file.path
+          setCreatingFolder({
+            parentPath: currentPath,
+            tempId: "temp-" + Date.now()
           });
           onClose();
         }}
@@ -151,17 +155,6 @@ function ContextMenu({
       <Divider />
 
       {/* ---------- MOVE DESTINATIONS ---------- */}
-      {destinations.map(dest => (
-        <HoverFolder
-          key={dest.path}
-          folder={dest}
-          tree={tree}
-          depth={0}
-          file={file}
-          onMove={onMove}
-          loadFolder={loadFolder}
-        />
-      ))}
     </div>
   );
 }

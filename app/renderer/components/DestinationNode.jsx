@@ -1,212 +1,185 @@
-import React, { useState } from 'react';
-import {
-  createDragPayload,
-  parseDragPayload,
-  resolveTargetFolder,
-  isInvalidMove
-} from '../utils/dragDrop';
-
+import React from 'react';
+import { Folder, File } from 'lucide-react';
+import { theme } from '../styles/theme'
 function DestinationNode({
   item,
-  depth,
-  tree,
-  expanded,
-  toggleFolder,
+  currentPath,
+  pathStack,
+  setPathStack,
   selectedFile,
   setSelectedFile,
   openFile,
   onPreview,
+  onContextMenu,
   onMove,
-  creatingFolder,
-  setCreatingFolder
+  isTemp,
+  onCreate,
+  cancelCreate,
+  loadFolder,
+  viewMode
 }) {
   const isFolder = item.type === 'folder';
-  const isOpen = expanded.has(item.path);
   const isSelected = selectedFile?.path === item.path;
 
-  const [isDragOver, setIsDragOver] = useState(false);
+  // ---------------- BASE STYLE ----------------
+  const baseStyle = {
+    cursor: isTemp ? 'default' : 'pointer',
+    background: isSelected ? theme.selected : 'transparent',
+    borderRadius: '6px',
+    transition: 'all 0.12s ease',
+    color: theme.text,
+    outline: 'none'
+  };
 
-  // ---------------- CHILDREN ----------------
-  let children = tree[item.path] || [];
+  const listStyle = {
+    ...baseStyle,
+    padding: '6px 10px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  };
 
-  // 🔥 Inject temp folder (Finder-style)
-  if (creatingFolder?.parentPath === item.path) {
-    console.log("creatingFolder:", creatingFolder);
-
-    children = [
-      {
-        path: creatingFolder.tempId,
-        name: "",
-        type: "folder",
-        isTemp: true
-      },
-      ...children
-    ];
-  }
-
-  // ---------------- CREATE HANDLER ----------------
-  const handleCreate = async (name) => {
-    console.log("creatingFolder:", creatingFolder);
-    if (!name.trim()) {
-      setCreatingFolder(null);
-      return;
-    }
-
-    if (!creatingFolder?.parentPath) return;
-
-    await onMove({
-      action: "create-folder",
-      targetPath: creatingFolder.parentPath,
-      name
-    });
-    
-
-    setCreatingFolder(null);
+  const gridStyle = {
+    ...baseStyle,
+    padding: '12px 8px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    textAlign: 'center',
+    minHeight: '80px'
   };
 
   return (
-    <div>
-      {/* ---------- NODE ROW ---------- */}
-      <div
-        draggable={!item.isTemp} // ✅ prevent dragging temp node
+    <div
+      data-node="true"
+      draggable={!isTemp}
 
-        onDragStart={(e) => {
-          if (item.isTemp) return;
+      // ---------------- DRAG ----------------
+      onDragStart={(e) => {
+        if (isTemp) return;
+        e.dataTransfer.setData('application/json', JSON.stringify(item));
+      }}
 
-          e.dataTransfer.setData(
-            'application/json',
-            createDragPayload(item)
-          );
-        }}
+      onDragOver={(e) => e.preventDefault()}
 
-        onDragOver={(e) => {
-          e.preventDefault();
-          setIsDragOver(true);
-        }}
+      onDrop={(e) => {
+        e.preventDefault();
+        if (isTemp) return;
 
-        onDragLeave={() => setIsDragOver(false)}
+        const data = JSON.parse(e.dataTransfer.getData('application/json'));
+        if (!data?.path) return;
 
-        onDrop={(e) => {
-          e.preventDefault();
-          setIsDragOver(false);
+        onMove({
+          action: "move",
+          sourcePath: data.path,
+          targetPath: isFolder ? item.path : currentPath
+        });
+      }}
 
-          if (item.isTemp) return; // ✅ guard
+      // ---------------- CLICK ----------------
+      onClick={() => {
+        if (isTemp) return;
 
-          const data = parseDragPayload(e);
-          if (!data) return;
+        setSelectedFile(item);
 
-          const target = resolveTargetFolder(item);
-          if (!target) return;
+        if (!isFolder) {
+          onPreview(item);
+        }
+      }}
 
-          if (isInvalidMove(data.path, target)) return;
+      // ---------------- DOUBLE CLICK ----------------
+      onDoubleClick={async () => {
+        if (isTemp) return;
 
-          onMove({
-            action: "move",
-            sourcePath: data.path,
-            targetPath: target
-          });
-        }}
-
-        onClick={() => {
-          if (item.isTemp) return; // ✅ prevent temp interaction
-
-          setSelectedFile(item);
-          if (isFolder) toggleFolder(item.path);
-        }}
-
-        onDoubleClick={() => {
-          if (!isFolder || item.isTemp) return;
+        if (isFolder) {
+          await loadFolder(item.path);
+          setPathStack(prev => [...prev, item.path]);
+        } else {
           openFile(item);
-        }}
+        }
+      }}
 
-        onContextMenu={(e) => {
-          if (item.isTemp) return; // ✅ no menu on temp
-          e.preventDefault();
-          if (onPreview) {
-            onPreview(item, e, "destination");
-          }
-        }}
+      // ---------------- CONTEXT ----------------
+      onContextMenu={(e) => {
+        if (isTemp) return;
+        e.preventDefault();
+        onContextMenu(item, e);
+      }}
 
-        style={{
-          paddingLeft: depth * 14,
-          cursor: item.isTemp ? 'default' : 'grab',
-          userSelect: 'none',
-          fontWeight: isFolder ? 600 : 400,
-          backgroundColor: isDragOver
-            ? '#bfdbfe'
-            : isSelected
-            ? '#dbeafe'
-            : 'transparent'
-        }}
-      >
-        {/* ---------- EXPAND ICON ---------- */}
-        {isFolder && !item.isTemp && (
-          <span style={{ marginRight: 6 }}>
-            {isOpen ? '▼' : '▶'}
-          </span>
-        )}
+      // ---------------- HOVER EFFECT ----------------
+      onMouseEnter={(e) => {
+        if (!isSelected) {
+          e.currentTarget.style.background = theme.hover;
+          e.currentTarget.style.outline = `1px solid ${theme.border}`;
+        }
+      }}
 
-        {/* ---------- ICON ---------- */}
-        <span style={{ marginRight: 6 }}>
-          {isFolder ? '📁' : '📄'}
-        </span>
+      onMouseLeave={(e) => {
+        if (!isSelected) {
+          e.currentTarget.style.background = 'transparent';
+          e.currentTarget.style.outline = 'none';
+        }
+      }}
 
-        {/* ---------- NAME / INPUT ---------- */}
-        {item.isTemp ? (
-          <input
-            autoFocus
-            defaultValue="New Folder"
+      style={viewMode === 'grid' ? gridStyle : listStyle}
+    >
+      {isTemp ? (
+        <input
+          autoFocus
+          defaultValue="New Folder"
+          onBlur={(e) => onCreate(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onCreate(e.target.value);
+            if (e.key === 'Escape') cancelCreate();
+          }}
+        />
+      ) : viewMode === 'grid' ? (
+        <>
+          {/* ICON */}
+          {isFolder ? (
+            <Folder size={26} color={theme.muted} />
+          ) : (
+            <File size={26} color={theme.muted} />
+          )}
 
-            onBlur={(e) => {
-              // ✅ avoid double trigger with Enter
-              if (e.relatedTarget === null) return;
-              handleCreate(e.target.value);
-            }}
-
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleCreate(e.target.value);
-              }
-
-              if (e.key === 'Escape') {
-                setCreatingFolder(null);
-              }
-            }}
-
+          {/* NAME */}
+          <div
             style={{
-              background: '#1e1e1e',
-              color: '#fff',
-              border: '1px solid #555',
-              outline: 'none',
-              fontSize: '13px',
-              padding: '2px 4px'
+              fontSize: '12px',
+              color: theme.text,
+              opacity: 0.9,
+              marginTop: 6,
+              maxWidth: '100%',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
             }}
-          />
-        ) : (
-          item.name
-        )}
-      </div>
+          >
+            {item.name}
+          </div>
+        </>
+      ) : (
+        <>
+          {/* ICON */}
+          {isFolder ? (
+            <Folder size={18} color={theme.muted} />
+          ) : (
+            <File size={18} color={theme.muted} />
+          )}
 
-      {/* ---------- CHILDREN ---------- */}
-      {isFolder && isOpen &&
-        children.map(child => (
-          <DestinationNode
-            key={child.path}
-            item={child}
-            depth={depth + 1}
-            tree={tree}
-            expanded={expanded}
-            toggleFolder={toggleFolder}
-            selectedFile={selectedFile}
-            setSelectedFile={setSelectedFile}
-            openFile={openFile}
-            onPreview={onPreview}
-            onMove={onMove}
-            creatingFolder={creatingFolder}
-            setCreatingFolder={setCreatingFolder}
-          />
-        ))
-      }
+          {/* NAME */}
+          <span
+            style={{
+              color: theme.text,
+              fontSize: '13px',
+              opacity: 0.9
+            }}
+          >
+            {item.name}
+          </span>
+        </>
+      )}
     </div>
   );
 }

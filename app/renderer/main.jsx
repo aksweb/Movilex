@@ -1,16 +1,29 @@
-import React, { useState } from 'react';
+//main.jsx
+// App (state + handlers)
+//   ↓
+// WorkspaceLayout (wiring only)
+//   ↓
+// DestinationPanel (pass-through)
+//   ↓
+// DestinationNode (triggers)
+
+import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
+import WorkspaceLayout from './WorkspaceLayout';
+import './index.css';
 
 import PreviewPane from './components/PreviewPane';
 import DestinationPanel from './components/DestinationPanel';
 import ContextMenu from './components/ContextMenu';
 import { handleFileAction } from './utils/fileActions';
+import TopBar from './components/TopBar';
+
+import { theme } from './styles/theme';
 
 function App() {
   const [tree, setTree] = useState({});
   const [destRoot, setDestRoot] = useState(null);
 
-  const [expandedDest, setExpandedDest] = useState(new Set());
   const [selectedDestFile, setSelectedDestFile] = useState(null);
   const [previewDestFile, setPreviewDestFile] = useState(null);
 
@@ -20,10 +33,30 @@ function App() {
   const [contextMenu, setContextMenu] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const [creatingFolder, setCreatingFolder] = useState(null); // { parentPath, tempId } 
+  const [creatingFolder, setCreatingFolder] = useState(null);
+  const [clipboard, setClipboard] = useState(null);
 
-  const [clipboard, setClipboard] = useState(null); //for cut and copy
+  // 🔥 Finder-style navigation state : using stack
+  const [pathStack, setPathStack] = useState([]);
 
+  const currentPath = pathStack[pathStack.length - 1] || null;
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  const [viewMode, setViewMode] = useState('list'); // 'grid'
+
+  // ---------------- SYNC ROOT ----------------
+  // 🔥 ONLY reset stack on root change
+  useEffect(() => {
+    if (destRoot) {
+      setPathStack([destRoot]); // 🔥 initialize stack
+      setPreviewDestFile(null);
+    }
+  }, [destRoot]);
+
+  // 🔥 clear preview on navigation
+  useEffect(() => {
+    setPreviewDestFile(null);
+  }, [destRoot, currentPath]);
 
   // ---------------- LOADER ----------------
   const withLoading = async (fn) => {
@@ -38,8 +71,6 @@ function App() {
 
   // ---------------- LOAD FOLDER ----------------
   const loadFolder = async (folderPath) => {
-    if (tree[folderPath]) return;
-
     const children = await window.api.listDirectory(folderPath);
 
     setTree(prev => ({
@@ -55,12 +86,19 @@ function App() {
 
     const name = newDestName || dir.split('/').pop();
 
-    if (destinations.some(d => d.path === dir)) return;
+    if (destinations.some(d => d.path === dir)) {
+      setDestRoot(dir); // switch instead of ignoring
+      return;
+    }
 
     const newDest = { name, path: dir, checked: true };
 
+    // setDestinations(prev => [...prev, newDest]);
+    // setDestRoot(dir);
     setDestinations(prev => [...prev, newDest]);
-    setDestRoot(dir);
+    // only set root if first destination
+    setDestRoot(prev => prev ?? dir);
+
     setNewDestName("");
 
     await withLoading(async () => {
@@ -70,42 +108,15 @@ function App() {
         ...prev,
         [dir]: children
       }));
-
-      setExpandedDest(prev => new Set(prev).add(dir));
     });
-  };
-
-  // ---------------- TOGGLE DEST ----------------
-  const toggleDestination = (path) => {
-    setDestinations(prev =>
-      prev.map(d =>
-        d.path === path ? { ...d, checked: !d.checked } : d
-      )
-    );
-  };
-
-  // ---------------- TOGGLE FOLDER ----------------
-  const toggleDestFolder = async (path) => {
-    if (expandedDest.has(path)) {
-      setExpandedDest(prev => {
-        const next = new Set(prev);
-        next.delete(path);
-        return next;
-      });
-      return;
-    }
-
-    if (!tree[path]) {
-      const children = await window.api.listDirectory(path);
-      setTree(prev => ({ ...prev, [path]: children }));
-    }
-
-    setExpandedDest(prev => new Set(prev).add(path));
   };
 
   // ---------------- ACTION HANDLER ----------------
   const handleAction = (payload) => {
-    handleFileAction(payload, { setTree });
+    handleFileAction(payload, {
+      setTree,
+      currentPath   // 🔥 ensures refresh happens in correct folder
+    });
   };
 
   // ---------------- OPEN FILE ----------------
@@ -113,9 +124,41 @@ function App() {
     await window.api.openFile(file.path);
   };
 
+  const handlePreview = (file) => {
+    if (!file || file.type === 'folder') return;
+    setPreviewDestFile(file);
+  };
+  
+
+  // const handleContextMenu = (file, e) => {
+  //   setContextMenu({
+  //     x: e.clientX,
+  //     y: e.clientY,
+  //     file
+  //   });
+  // };
+  const handleContextMenu = (file, e) => {
+    e.stopPropagation(); // 🔥 prevent double execution
+  
+    // 🔥 if empty space → fallback to current folder
+    const target = file ?? {
+      path: currentPath,
+      type: 'folder',
+      isContainer: true
+    };
+  
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      file: target
+    });
+  };
+
   // ---------------- UI ----------------
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: theme.bg,
+color: theme.text, overflow:'hidden'
+ }}>
 
       {/* LOADER */}
       {loading && (
@@ -134,81 +177,79 @@ function App() {
       )}
 
       {/* TOP BAR */}
-      <div style={{ padding: 10, borderBottom: '1px solid #ccc' }}>
-        <input
-          placeholder="Destination name"
-          value={newDestName}
-          onChange={(e) => setNewDestName(e.target.value)}
-        />
-        <button onClick={selectDest}>Create Destination</button>
-      </div>
+      <TopBar
+        newDestName={newDestName}
+        setNewDestName={setNewDestName}
+        onAdd={selectDest}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+      />
 
       {/* MAIN */}
-      <div style={{ flex: 1, display: 'flex' }}>
+      {/* ------------------------------------------- */}
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,     // 🔥 THIS is what enables inner scrolling
+          display: 'flex'
+        }}
+      >
+        <WorkspaceLayout
+          viewMode={viewMode}
 
-        {/* LEFT → DESTINATION */}
-        <div style={{
-          width: '40%',
-          borderRight: '1px solid #ccc',
-          overflow: 'auto',
-          padding: 10
-        }}>
-          {destinations.filter(d => d.checked).map(dest => (
-            <DestinationPanel
-              key={dest.path}
-              tree={tree}
-              destRoot={dest.path}
-              expanded={expandedDest}
-              toggleFolder={toggleDestFolder}
-              selectedFile={selectedDestFile}
-              setSelectedFile={setSelectedDestFile}
-              openFile={openFile}
-              onPreview={(file, event) => {
-                setContextMenu({
-                  x: event.clientX,
-                  y: event.clientY,
-                  file,
-                  origin: "destination"
-                });
-              }}
-              onMove={handleAction}
-              creatingFolder={creatingFolder}
-              setCreatingFolder={setCreatingFolder}
-            />
-          ))}
-        </div>
+          destinations={destinations}
+          destRoot={destRoot}
+          setDestRoot={setDestRoot}
 
-        {/* RIGHT → PREVIEW */}
-        <div style={{
-          width: '60%',
-          padding: 10,
-          overflow: 'auto'
-        }}>
-          {previewDestFile ? (
-            <PreviewPane file={previewDestFile} />
-          ) : (
-            <div style={{ color: '#888' }}>
-              Select a file to preview
-            </div>
-          )}
-        </div>
+          tree={tree}
+          setTree={setTree}
+
+          currentPath={currentPath}
+          pathStack={pathStack}
+          setPathStack={setPathStack}
+
+          selectedDestFile={selectedDestFile}
+          setSelectedDestFile={setSelectedDestFile}
+
+          previewDestFile={previewDestFile}
+          setPreviewDestFile={setPreviewDestFile}
+
+          openFile={openFile}
+          handleAction={handleAction}
+
+          creatingFolder={creatingFolder}
+          setCreatingFolder={setCreatingFolder}
+
+          setContextMenu={setContextMenu}
+
+          isSidebarOpen={isSidebarOpen}
+          setIsSidebarOpen={setIsSidebarOpen}
+
+        
+    handlePreview={handlePreview}           // 🔥 FIXED
+          handleContextMenu={handleContextMenu}   // 🔥 FIXED
+        />
 
       </div>
+      
+        {/* CONTEXT MENU */}
+        <ContextMenu
+          menu={contextMenu}
+          onClose={() => setContextMenu(null)}
+          onPreview={(file) => setPreviewDestFile(file)}
+          onMove={handleAction}
+          setCreatingFolder={setCreatingFolder}
+          clipboard={clipboard}
+          setClipboard={setClipboard}
+          currentPath={currentPath}
 
-      {/* CONTEXT MENU */}
-      <ContextMenu
-        menu={contextMenu}
-        destinations={destinations}
-        tree={tree}
-        onClose={() => setContextMenu(null)}
-        onPreview={(file) => setPreviewDestFile(file)}
-        onMove={handleAction}
-        loadFolder={loadFolder}
-        setCreatingFolder={setCreatingFolder}
-        clipboard={clipboard}
-        setClipboard={setClipboard}
-      />
+        />
+      
+      
     </div>
+
+   
+
   );
 }
 
