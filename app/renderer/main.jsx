@@ -17,48 +17,85 @@ import DestinationPanel from './components/DestinationPanel';
 import ContextMenu from './components/ContextMenu';
 import { handleFileAction } from './utils/fileActions';
 import TopBar from './components/TopBar';
+import MoveToast from './components/MoveToast';
+import { usePersistentState } from '../renderer/components/hooks/usePersistentState.js';
 
 import { theme } from './styles/theme';
 
-function App() {
-  const [tree, setTree] = useState({});
-  const [destRoot, setDestRoot] = useState(null);
 
+function App() {
+  // ================= PERSISTENT STATE =================
+  const [destinations, setDestinations] = usePersistentState(
+    "destinations",
+    [],
+    { debounce: 100 }
+  );
+
+  const [destRoot, setDestRoot] = usePersistentState(
+    "destRoot",
+    null
+  );
+
+  const [pathStack, setPathStack] = usePersistentState(
+    "pathStack",
+    []
+  );
+
+  const [isSidebarOpen, setIsSidebarOpen] = usePersistentState(
+    "sidebar",
+    true
+  );
+
+  // ================= VALIDATE ROOT =================
+  useEffect(() => {
+    if (!destRoot) return;
+
+    const exists = destinations.some(d => d.path === destRoot);
+
+    if (!exists) {
+      setDestRoot(destinations[0]?.path || null);
+    }
+  }, [destinations, destRoot]);
+
+  // ================= NORMAL STATE =================
+  const [tree, setTree] = useState({});
   const [selectedDestFile, setSelectedDestFile] = useState(null);
   const [previewDestFile, setPreviewDestFile] = useState(null);
 
-  const [destinations, setDestinations] = useState([]);
   const [newDestName, setNewDestName] = useState("");
-
   const [contextMenu, setContextMenu] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const [creatingFolder, setCreatingFolder] = useState(null);
   const [clipboard, setClipboard] = useState(null);
 
-  // 🔥 Finder-style navigation state : using stack
-  const [pathStack, setPathStack] = useState([]);
-
   const currentPath = pathStack[pathStack.length - 1] || null;
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  const [viewMode, setViewMode] = useState('list'); // 'grid'
+  const [viewMode, setViewMode] = useState('list');
+  const [moveToast, setMoveToast] = useState(null);
 
-  // ---------------- SYNC ROOT ----------------
-  // 🔥 ONLY reset stack on root change
+  // ================= SYNC ROOT (FIXED) =================
+  const isFirstLoad = React.useRef(true);
+
   useEffect(() => {
+    // 🔥 skip initial restore
+    if (isFirstLoad.current) {
+      isFirstLoad.current = false;
+      return;
+    }
+
     if (destRoot) {
-      setPathStack([destRoot]); // 🔥 initialize stack
+      setPathStack([destRoot]);
       setPreviewDestFile(null);
     }
   }, [destRoot]);
 
-  // 🔥 clear preview on navigation
+  // ================= CLEAR PREVIEW =================
   useEffect(() => {
     setPreviewDestFile(null);
   }, [destRoot, currentPath]);
 
-  // ---------------- LOADER ----------------
+  // ================= LOADER =================
   const withLoading = async (fn) => {
     if (loading) return;
     setLoading(true);
@@ -69,7 +106,7 @@ function App() {
     }
   };
 
-  // ---------------- LOAD FOLDER ----------------
+  // ================= LOAD FOLDER =================
   const loadFolder = async (folderPath) => {
     const children = await window.api.listDirectory(folderPath);
 
@@ -79,7 +116,7 @@ function App() {
     }));
   };
 
-  // ---------------- CREATE DESTINATION ----------------
+  // ================= CREATE DESTINATION =================
   const selectDest = async () => {
     const dir = await window.api.selectDestinationFolder();
     if (!dir) return;
@@ -87,16 +124,13 @@ function App() {
     const name = newDestName || dir.split('/').pop();
 
     if (destinations.some(d => d.path === dir)) {
-      setDestRoot(dir); // switch instead of ignoring
+      setDestRoot(dir);
       return;
     }
 
     const newDest = { name, path: dir, checked: true };
 
-    // setDestinations(prev => [...prev, newDest]);
-    // setDestRoot(dir);
     setDestinations(prev => [...prev, newDest]);
-    // only set root if first destination
     setDestRoot(prev => prev ?? dir);
 
     setNewDestName("");
@@ -111,15 +145,17 @@ function App() {
     });
   };
 
-  // ---------------- ACTION HANDLER ----------------
+  // ================= ACTION HANDLER =================
   const handleAction = (payload) => {
     handleFileAction(payload, {
       setTree,
-      currentPath   // 🔥 ensures refresh happens in correct folder
+      currentPath,
+      setMoveToast,
+      setPreviewDestFile
     });
   };
 
-  // ---------------- OPEN FILE ----------------
+  // ================= FILE HANDLERS =================
   const openFile = async (file) => {
     await window.api.openFile(file.path);
   };
@@ -128,25 +164,29 @@ function App() {
     if (!file || file.type === 'folder') return;
     setPreviewDestFile(file);
   };
-  
 
-  // const handleContextMenu = (file, e) => {
-  //   setContextMenu({
-  //     x: e.clientX,
-  //     y: e.clientY,
-  //     file
-  //   });
-  // };
+  const handleRemoveDestination = (path) => {
+    setDestinations(prev => {
+      const next = prev.filter(d => d.path !== path);
+
+      if (path === destRoot) {
+        setDestRoot(next.length ? next[0].path : null);
+      }
+
+      return next;
+    });
+  };
+
+  // ================= CONTEXT MENU =================
   const handleContextMenu = (file, e) => {
-    e.stopPropagation(); // 🔥 prevent double execution
-  
-    // 🔥 if empty space → fallback to current folder
+    e.stopPropagation();
+
     const target = file ?? {
       path: currentPath,
       type: 'folder',
       isContainer: true
     };
-  
+
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
@@ -154,6 +194,36 @@ function App() {
     });
   };
 
+  // ================= NAVIGATION =================
+  const buildStack = (path, root) => {
+    if (!path || !root) return [];
+
+    if (!path.startsWith(root)) return [root];
+
+    const relative = path.slice(root.length).split('/').filter(Boolean);
+
+    const stack = [root];
+    let current = root;
+
+    for (const part of relative) {
+      current = current + '/' + part;
+      stack.push(current);
+    }
+
+    return stack;
+  };
+
+  const handleNavigate = async (path) => {
+    if (!path || !destRoot) return;
+
+    if (!path.startsWith(destRoot)) {
+      console.warn("Blocked navigation outside destination:", path);
+      return;
+    }
+
+    await loadFolder(path);
+    setPathStack(buildStack(path, destRoot));
+  };
   // ---------------- UI ----------------
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: theme.bg,
@@ -200,6 +270,8 @@ color: theme.text, overflow:'hidden'
           destinations={destinations}
           destRoot={destRoot}
           setDestRoot={setDestRoot}
+          handleRemoveDestination={handleRemoveDestination}   // ✅ ADD
+
 
           tree={tree}
           setTree={setTree}
@@ -226,8 +298,10 @@ color: theme.text, overflow:'hidden'
           setIsSidebarOpen={setIsSidebarOpen}
 
         
-    handlePreview={handlePreview}           // 🔥 FIXED
+          handlePreview={handlePreview}           // 🔥 FIXED
           handleContextMenu={handleContextMenu}   // 🔥 FIXED
+
+          loadFolder={loadFolder}
         />
 
       </div>
@@ -235,6 +309,9 @@ color: theme.text, overflow:'hidden'
         {/* CONTEXT MENU */}
         <ContextMenu
           menu={contextMenu}
+          destinations={destinations}
+          tree={tree}
+          loadFolder={loadFolder}
           onClose={() => setContextMenu(null)}
           onPreview={(file) => setPreviewDestFile(file)}
           onMove={handleAction}
@@ -243,6 +320,11 @@ color: theme.text, overflow:'hidden'
           setClipboard={setClipboard}
           currentPath={currentPath}
 
+        />
+        <MoveToast
+          toast={moveToast}
+          onClose={() => setMoveToast(null)}
+          onNavigate={handleNavigate}
         />
       
       

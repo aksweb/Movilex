@@ -1,13 +1,14 @@
 import React from 'react';
-import { PanelLeftClose, PanelLeftOpen, Folder } from 'lucide-react';
-import { theme } from '../styles/theme'; // adjust if needed
+import { PanelLeftClose, PanelLeftOpen, Folder, X } from 'lucide-react';
+import { theme } from '../styles/theme';
 
 function Sidebar({
   destinations,
   destRoot,
   setDestRoot,
   isSidebarOpen,
-  setIsSidebarOpen
+  setIsSidebarOpen,
+  onRemoveDestination   // 🔥 NEW
 }) {
 
   return (
@@ -35,15 +36,11 @@ function Sidebar({
           justifyContent: 'center',
 
           cursor: 'pointer',
-          borderBottom: `1px solid ${theme.border}`,
-
-          transition: 'all 0.15s ease'
+          borderBottom: `1px solid ${theme.border}`
         }}
-
         onMouseEnter={(e) => {
           e.currentTarget.style.background = theme.hover;
         }}
-
         onMouseLeave={(e) => {
           e.currentTarget.style.background = 'transparent';
         }}
@@ -60,7 +57,7 @@ function Sidebar({
             flex: 1,
             overflowY: 'auto',
             minHeight: 0,
-            padding: '6px'
+            padding: 6
           }}
         >
           {destinations.map(dest => {
@@ -74,11 +71,10 @@ function Sidebar({
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  gap: 8,
 
                   padding: '8px 10px',
                   marginBottom: 4,
-
                   borderRadius: 6,
 
                   cursor: 'pointer',
@@ -89,19 +85,28 @@ function Sidebar({
 
                   color: theme.text,
 
-                  transition: 'all 0.15s ease'
+                  transition: 'all 0.15s ease',
+
+                  position: 'relative'
                 }}
 
                 onMouseEnter={(e) => {
                   if (!isActive) {
                     e.currentTarget.style.background = theme.hover;
                   }
+
+                  // 🔥 show close button
+                  const closeBtn = e.currentTarget.querySelector('.close-btn');
+                  if (closeBtn) closeBtn.style.opacity = 1;
                 }}
 
                 onMouseLeave={(e) => {
                   if (!isActive) {
                     e.currentTarget.style.background = 'transparent';
                   }
+
+                  const closeBtn = e.currentTarget.querySelector('.close-btn');
+                  if (closeBtn) closeBtn.style.opacity = 0;
                 }}
               >
                 {/* ICON */}
@@ -110,7 +115,8 @@ function Sidebar({
                 {/* NAME */}
                 <span
                   style={{
-                    fontSize: '13px',
+                    flex: 1,
+                    fontSize: 13,
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis'
@@ -118,6 +124,41 @@ function Sidebar({
                 >
                   {dest.name}
                 </span>
+
+                {/* 🔥 REMOVE BUTTON */}
+                <div
+                  className="close-btn"
+                  onClick={(e) => {
+                    e.stopPropagation(); // 🔥 prevent navigation
+
+                    onRemoveDestination(dest.path);
+                  }}
+                  style={{
+                    width: 20,
+                    height: 20,
+
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+
+                    borderRadius: 4,
+
+                    opacity: 0,
+                    transition: 'opacity 0.15s ease',
+
+                    cursor: 'pointer'
+                  }}
+
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = theme.hover;
+                  }}
+
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  <X size={12} color={theme.muted} />
+                </div>
               </div>
             );
           })}

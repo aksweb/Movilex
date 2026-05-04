@@ -1,5 +1,6 @@
-//destinationPanel.jsx (Dont remove this file name)
-import React from 'react';
+// destinationPanel.jsx (Dont remove this file name)
+
+import React, { useEffect } from 'react';
 import DestinationNode from './DestinationNode';
 import { theme } from '../styles/theme';
 import DestinationHeader from './DestinationHeader';
@@ -41,13 +42,15 @@ function DestinationPanel({
     }));
   };
 
-  // ---------------- ITEMS ----------------
-  let items = tree[normalizedPath];
+  // 🔥 FIX 1: move async out of render
+  useEffect(() => {
+    if (!tree[normalizedPath]) {
+      loadFolder(normalizedPath);
+    }
+  }, [normalizedPath]);
 
-  if (!items) {
-    loadFolder(normalizedPath);
-    items = [];
-  }
+  // ---------------- ITEMS ----------------
+  let items = tree[normalizedPath] || [];
 
   // ---------------- TEMP FOLDER ----------------
   if (
@@ -65,23 +68,52 @@ function DestinationPanel({
     ];
   }
 
+  // 🔥 FIX 2: auto-clean temp folder when navigating away
+  useEffect(() => {
+    if (!creatingFolder) return;
+
+    if (normalizePath(creatingFolder.parentPath) !== normalizedPath) {
+      setCreatingFolder(null);
+    }
+  }, [normalizedPath]);
+
   // ---------------- CREATE ----------------
   const handleCreate = async (name) => {
-    if (!name.trim()) {
+    const cleanName = name.trim();
+  
+    if (!cleanName) {
       setCreatingFolder(null);
       return;
     }
-
+  
+    // 🔥 DUPLICATE CHECK
+    const exists = (tree[normalizedPath] || []).some(
+      item =>
+        item.type === 'folder' &&
+        item.name.toLowerCase() === cleanName.toLowerCase()
+    );
+  
+    if (exists) {
+      // 🔥 notify user (reuse your toast system)
+      onMove({
+        action: "__notify__",
+        message: `Folder "${cleanName}" already exists`
+      });
+  
+      setCreatingFolder(null);
+      return;
+    }
+  
     await onMove({
       action: "create-folder",
       targetPath: normalizedPath,
-      name
+      name: cleanName
     });
-
+  
     setCreatingFolder(null);
   };
 
-  // ---------------- BACK (STACK BASED) ----------------
+  // ---------------- BACK ----------------
   const handleBack = () => {
     setPathStack(prev => {
       if (prev.length <= 1) return prev;
@@ -94,75 +126,80 @@ function DestinationPanel({
       style={{ padding: 8, background: theme.bg }}
       onContextMenu={(e) => {
         e.preventDefault();
-
-        onContextMenu(null, e); // 🔥 null = empty space intent
-
+        onContextMenu(null, e);
       }}
     >
-      {/* PATH and BACK */}
+
+      {/* HEADER */}
       <DestinationHeader
         normalizedPath={normalizedPath}
         pathStack={pathStack}
         onBack={handleBack}
+
+        // 🔥 FIX 3: prevent multiple temp folders
+        onCreateFolder={() => {
+          if (creatingFolder) return;
+
+          setCreatingFolder({
+            parentPath: normalizedPath,
+            tempId: "temp-" + Date.now()
+          });
+        }}
       />
 
       {/* LIST */}
-
-
       {viewMode === 'grid' ? (
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-          gap: '10px'
-        }}
-      >
-      {items.map(item => (
-        <DestinationNode
-          key={item.path}
-          item={item}
-          currentPath={normalizedPath}
-          pathStack={pathStack}
-          setPathStack={setPathStack}
-          selectedFile={selectedFile}
-          setSelectedFile={setSelectedFile}
-          openFile={openFile}
-          onPreview={onPreview}
-          onContextMenu={onContextMenu}
-          onMove={onMove}
-          isTemp={item.isTemp}
-          onCreate={handleCreate}
-          cancelCreate={() => setCreatingFolder(null)}
-          loadFolder={loadFolder}
-          viewMode="grid"
-
-        />
-        ))}
-      </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+            gap: 10
+          }}
+        >
+          {items.map(item => (
+            <DestinationNode
+              key={item.path}
+              item={item}
+              currentPath={normalizedPath}
+              pathStack={pathStack}
+              setPathStack={setPathStack}
+              selectedFile={selectedFile}
+              setSelectedFile={setSelectedFile}
+              openFile={openFile}
+              onPreview={onPreview}
+              onContextMenu={onContextMenu}
+              onMove={onMove}
+              isTemp={item.isTemp}
+              onCreate={handleCreate}
+              cancelCreate={() => setCreatingFolder(null)}
+              loadFolder={loadFolder}
+              viewMode="grid"
+            />
+          ))}
+        </div>
       ) : (
-          <div>
-            {items.map(item => (
-              <DestinationNode
-                  key={item.path}
-                  item={item}
-                  currentPath={normalizedPath}
-                  pathStack={pathStack}
-                  setPathStack={setPathStack}
-                  selectedFile={selectedFile}
-                  setSelectedFile={setSelectedFile}
-                  openFile={openFile}
-                  onPreview={onPreview}
-                  onContextMenu={onContextMenu}
-                  onMove={onMove}
-                  isTemp={item.isTemp}
-                  onCreate={handleCreate}
-                  cancelCreate={() => setCreatingFolder(null)}
-                  loadFolder={loadFolder}
-                  viewMode="list"
-
-                />
-            ))}
-      </div>
+        <div>
+          {items.map(item => (
+            <DestinationNode
+              key={item.path}
+              item={item}
+              currentPath={normalizedPath}
+              pathStack={pathStack}
+              setPathStack={setPathStack}
+              selectedFile={selectedFile}
+              setSelectedFile={setSelectedFile}
+              openFile={openFile}
+              onPreview={onPreview}
+              onContextMenu={onContextMenu}
+              onMove={onMove}
+              isTemp={item.isTemp}
+              onCreate={handleCreate}
+              cancelCreate={() => setCreatingFolder(null)}
+              loadFolder={loadFolder}
+              viewMode="list"
+            />
+          ))}
+        </div>
       )}
     </div>
   );

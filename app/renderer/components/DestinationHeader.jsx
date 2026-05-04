@@ -1,13 +1,13 @@
 import React from 'react';
-import { ArrowLeft } from 'lucide-react';
-import { theme } from '../styles/theme'
+import { ArrowLeft, FolderPlus } from 'lucide-react';
+import { theme } from '../styles/theme';
 
 function DestinationHeader({
   normalizedPath,
   pathStack,
-  onBack
+  onBack,
+  onCreateFolder   // 🔥 NEW
 }) {
-
   const canGoBack = pathStack.length > 1;
 
   return (
@@ -15,7 +15,7 @@ function DestinationHeader({
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '10px',
+        gap: 10,
         marginBottom: 10
       }}
     >
@@ -36,14 +36,12 @@ function DestinationHeader({
 
           transition: 'all 0.15s ease'
         }}
-
         onMouseEnter={(e) => {
           if (canGoBack) {
             e.currentTarget.style.background = theme.hover;
             e.currentTarget.style.outline = `1px solid ${theme.border}`;
           }
         }}
-
         onMouseLeave={(e) => {
           e.currentTarget.style.background = 'transparent';
           e.currentTarget.style.outline = 'none';
@@ -63,7 +61,7 @@ function DestinationHeader({
           border: `1px solid ${theme.border}`,
 
           color: theme.muted,
-          fontSize: '12px',
+          fontSize: 12,
 
           whiteSpace: 'nowrap',
           overflow: 'hidden',
@@ -71,6 +69,35 @@ function DestinationHeader({
         }}
       >
         {normalizedPath}
+      </div>
+
+      {/* CREATE FOLDER BUTTON */}
+      <div
+        onClick={onCreateFolder}
+        style={{
+          width: 30,
+          height: 30,
+
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+
+          borderRadius: 6,
+          cursor: 'pointer',
+
+          background: 'rgba(255,255,255,0.04)',
+          border: `1px solid ${theme.border}`,
+
+          transition: 'all 0.15s ease'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = theme.hover;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+        }}
+      >
+        <FolderPlus size={16} color={theme.text} />
       </div>
 
     </div>

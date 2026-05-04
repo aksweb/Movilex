@@ -59,6 +59,24 @@ export async function handleFileAction(payload, ctx) {
         });
         return next;
       });
+
+      // 🔥 CLOSE PREVIEW
+      console.log(ctx.setPreviewDestFile)
+      if (ctx.setPreviewDestFile) {
+        ctx.setPreviewDestFile(null);
+      }
+      console.log(ctx.setPreviewDestFile)
+
+
+
+      // 🔥 ADD THIS BLOCK (TOAST TRIGGER)
+      if (ctx.setMoveToast) {
+        ctx.setMoveToast({
+          path: targetPath,
+          name: targetPath.split('/').pop() || targetPath
+        });
+      }
+
     }
 
     // ================= DELETE =================
@@ -110,6 +128,7 @@ export async function handleFileAction(payload, ctx) {
 
       if (!res?.success) {
         console.error("Create failed:", res?.error);
+        
         return;
       }
 
@@ -160,6 +179,14 @@ export async function handleFileAction(payload, ctx) {
         ...prev,
         [targetPath]: updated
       }));
+
+      // 🔥 TOAST HERE ALSO
+      if (ctx.setMoveToast) {
+        ctx.setMoveToast({
+          path: targetPath,
+          name: targetPath.split('/').pop() || targetPath
+        });
+      }
     }
 
     // ================= INTERNAL =================

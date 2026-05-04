@@ -47,9 +47,14 @@ function WorkspaceLayout({
   setIsSidebarOpen,
   handlePreview,        // ✅ ADD
   handleContextMenu,    // ✅ ADD
+
+  loadFolder,
+  handleRemoveDestination
 }) {
 
     const isPreviewOpen = !!previewDestFile; // 🔥 TRUE if preview is open
+
+
     
       return (
         <div
@@ -68,6 +73,8 @@ function WorkspaceLayout({
             setDestRoot={setDestRoot}
             isSidebarOpen={isSidebarOpen}
             setIsSidebarOpen={setIsSidebarOpen}
+            onRemoveDestination={handleRemoveDestination}   // ✅ ADD
+
             />
     
           {/* ================= DESTINATION PANEL ================= */}
@@ -169,7 +176,13 @@ function WorkspaceLayout({
                   padding: 10
                 }}
               >
-                <PreviewPane file={previewDestFile} />
+                <PreviewPane
+                  file={previewDestFile}
+                  destinations={destinations}
+                  tree={tree}
+                  loadFolder={loadFolder}
+                  onMove={handleAction}
+                />
               </div>
             </div>
           )}

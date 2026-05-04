@@ -1,37 +1,52 @@
-/* ===== Base reset (keeps layout predictable) ===== */
+/* ================= PDF.JS ================= */
+@import 'pdfjs-dist/web/pdf_viewer.css';
+
+/* Fix text + annotation layers */
+.textLayer {
+  pointer-events: auto;
+  user-select: text;
+}
+
+.annotationLayer {
+  pointer-events: auto;
+}
+
+
+/* ================= BASE RESET ================= */
 html, body, #root {
-    height: 100%;
-    margin: 0;
-  }
-  
-  /* ===== Hide scrollbars (VSCode-style) ===== */
-  
-  /* Chrome / Electron / Edge */
-  *::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  
-  *::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  
-  *::-webkit-scrollbar-thumb {
-    background: transparent;
-    border-radius: 6px;
-  }
-  
-  /* Show subtle scrollbar on hover */
-  *:hover::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
-  }
-  
-  /* Firefox */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: transparent transparent;
-  }
-  
-  *:hover {
-    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
-  }
+  height: 100%;
+  margin: 0;
+}
+
+
+/* ================= SCROLLBARS (VSCode-style) ================= */
+
+/* Chrome / Electron / Edge */
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 6px;
+}
+
+/* Hover reveal */
+*:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
