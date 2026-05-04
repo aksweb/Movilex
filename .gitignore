@@ -141,3 +141,10 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+release/
+
+
+*.AppImage
+*.deb
+*.dmg
+*.exe
