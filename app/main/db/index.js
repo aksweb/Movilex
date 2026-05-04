@@ -5,7 +5,7 @@ const path = require('path');
 const { app } = require('electron');
 
 const userData = app.getPath('userData');
-const dbPath = path.join(userData, 'TreeFileManager.db');
+const dbPath = path.join(userData, 'Movilex.db');
 
 const db = new Database(dbPath);
 

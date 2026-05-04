@@ -52,6 +52,10 @@ function DestinationPanel({
   // ---------------- ITEMS ----------------
   let items = tree[normalizedPath] || [];
 
+  // 🔥 ADD THIS
+if (items.length > 0) {
+  console.log("ITEM SAMPLE:", items[0]);
+}
   // ---------------- TEMP FOLDER ----------------
   if (
     creatingFolder &&

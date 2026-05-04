@@ -45,6 +45,11 @@ function registerFileIpc() {
 
   // ---------------- LIST ----------------
   ipcMain.handle('list-directory', async (_, dirPath) => {
+    if (!dirPath || typeof dirPath !== 'string') {
+      console.warn('Invalid path for list-directory:', dirPath);
+      return []; // 🔥 safe fallback
+    }
+  
     return await listDirectory(dirPath);
   });
 
