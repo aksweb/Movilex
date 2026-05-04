@@ -1,0 +1,68 @@
+name: Build & Release Movilex
+
+on:
+push:
+tags:
+- 'v*'   # triggers on version tags like v1.0.0
+
+jobs:
+
+build:
+runs-on: ${{ matrix.os }}
+
+```
+strategy:
+  matrix:
+    os: [ubuntu-latest, macos-latest, windows-latest]
+
+steps:
+  - name: Checkout
+    uses: actions/checkout@v3
+
+  - name: Setup Node
+    uses: actions/setup-node@v4
+    with:
+      node-version: 20
+
+  - name: Install dependencies
+    run: npm install
+
+  # ---------- BUILD ----------
+  - name: Build Linux
+    if: matrix.os == 'ubuntu-latest'
+    run: npm run linux
+
+  - name: Build macOS
+    if: matrix.os == 'macos-latest'
+    run: npm run mac
+
+  - name: Build Windows
+    if: matrix.os == 'windows-latest'
+    run: npm run win
+
+  # ---------- UPLOAD ARTIFACTS ----------
+  - name: Upload artifacts
+    uses: actions/upload-artifact@v4
+    with:
+      name: movilex-${{ matrix.os }}
+      path: release/**
+```
+
+release:
+needs: build
+runs-on: ubuntu-latest
+
+```
+steps:
+  - name: Download artifacts
+    uses: actions/download-artifact@v4
+    with:
+      path: artifacts
+
+  - name: Create GitHub Release
+    uses: softprops/action-gh-release@v2
+    with:
+      files: artifacts/**/*
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
