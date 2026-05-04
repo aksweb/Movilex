@@ -61,11 +61,11 @@ export async function handleFileAction(payload, ctx) {
       });
 
       // 🔥 CLOSE PREVIEW
-      console.log(ctx.setPreviewDestFile)
+      // console.log(ctx.setPreviewDestFile)
       if (ctx.setPreviewDestFile) {
         ctx.setPreviewDestFile(null);
       }
-      console.log(ctx.setPreviewDestFile)
+      // console.log(ctx.setPreviewDestFile)
 
 
 
