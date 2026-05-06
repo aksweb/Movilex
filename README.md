@@ -163,7 +163,7 @@ and follow the installation steps.
 ## Clone Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/movilex.git
+git clone https://github.com/aksweb/movilex.git
 cd movilex
 ```
 
