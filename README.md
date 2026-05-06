@@ -1,7 +1,7 @@
 # Movilex
 
 <p align="center">
-  Fast, focused file movement for power users.
+  Fast, focused file movement for users who move files constantly.
 </p>
 
 <p align="center">
@@ -9,13 +9,9 @@
   <a href="https://github.com/aksweb/movilex/releases/latest">
     <img alt="Latest Release" src="https://img.shields.io/github/v/release/aksweb/movilex?style=flat-square">
   </a>
-
-  <img alt="Platforms" src="https://img.shields.io/badge/platforms-linux%20%7C%20macOS%20%7C%20windows-blue?style=flat-square">
-
-  <a href="LICENSE">
-    <img alt="License" src="https://img.shields.io/github/license/aksweb/movilex?style=flat-square">
-  </a>
 </p>
+<p align="center">  
+<a href="https://github.com/aksweb/Movilex/releases/download/v1.0.338/movilex_1.0.0_amd64.deb"><img alt="Download for Linux" src="https://img.shields.io/badge/Download-Linux-2ea44f?style=for-the-badge&logo=linux"></a><a href="https://github.com/aksweb/Movilex/releases/download/v1.0.338/Movilex-1.0.0-arm64.dmg"><img alt="Download for macOS" src="https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple"></a><a href="https://github.com/aksweb/Movilex/releases/download/v1.0.338/Movilex.Setup.1.0.0.exe"><img alt="Download for Windows" src="https://img.shields.io/badge/Download-Windows-0078D6?style=for-the-badge&logo=windows"></a></p>
 
 ---
 
